@@ -1,0 +1,60 @@
+name: technical
+description: 技术/物理系统
+
+roles:
+  component:
+    label_zh: 组件
+    fill: "#DBEAFE"
+    stroke: "#60A5FA"
+  controller:
+    label_zh: 控制器
+    fill: "#EDE9FE"
+    stroke: "#A78BFA"
+  sensor:
+    label_zh: 传感器
+    fill: "#DCFCE7"
+    stroke: "#4ADE80"
+  actuator:
+    label_zh: 执行器
+    fill: "#FEF9C3"
+    stroke: "#FACC15"
+  environment:
+    label_zh: 环境
+    fill: "#F3F4F6"
+    stroke: "#9CA3AF"
+  risk:
+    label_zh: 风险节点
+    fill: "#FEE2E2"
+    stroke: "#F87171"
+
+edge_types:
+  energy_flow:
+    label_zh: 能量流
+    color: "#EA580C"
+    style: solid
+  signal:
+    label_zh: 信号
+    color: "#2563EB"
+    style: dashed
+  control:
+    label_zh: 控制
+    color: "#7C3AED"
+    style: solid
+  material_flow:
+    label_zh: 物质流
+    color: "#16A34A"
+    style: solid
+  failure:
+    label_zh: 失效
+    color: "#DC2626"
+    style: dashed
+
+perspectives:
+  - name: 结构视角
+    focus: 组件、连接、边界
+  - name: 动力视角
+    focus: 能量、物质、信号流动
+  - name: 控制视角
+    focus: 反馈、传感、执行
+  - name: 失效视角
+    focus: 风险、瓶颈、冗余

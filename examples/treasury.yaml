@@ -1,0 +1,106 @@
+meta:
+  title: 美债如何运作
+  subtitle: 从发行、购买、交易到利率反馈的结构图
+  topic: 美债如何运作
+  ontology: financial
+  audience: beginner
+  language: zh
+  tags:
+    - treasury
+    - macro
+    - finance
+
+diagram:
+  type: system
+  direction: LR
+
+nodes:
+  - id: treasury
+    label: 美国财政部
+    sublabel: 发行国债以筹集财政资金
+    role: issuer
+  - id: auction
+    label: 国债拍卖
+    sublabel: 决定发行价格与收益率
+    role: market
+  - id: primary_dealers
+    label: 一级交易商
+    sublabel: 承销并提供市场流动性
+    role: intermediary
+  - id: investors
+    label: 投资者
+    sublabel: 机构、个人、外国央行
+    role: buyer
+  - id: fed
+    label: 美联储
+    sublabel: 通过货币政策影响利率环境
+    role: regulator
+  - id: treasury_bonds
+    label: 美国国债
+    sublabel: 政府信用支持的债务资产
+    role: asset
+  - id: interest_rate_risk
+    label: 利率风险
+    sublabel: 利率上行会压低既有债券价格
+    role: risk
+
+edges:
+  - from: treasury
+    to: auction
+    label: 发起发行
+    type: issuance
+    direction: forward
+  - from: auction
+    to: treasury_bonds
+    label: 形成债券
+    type: issuance
+    direction: forward
+  - from: primary_dealers
+    to: auction
+    label: 投标承销
+    type: fund_flow
+    direction: forward
+  - from: investors
+    to: primary_dealers
+    label: 购买
+    type: fund_flow
+    direction: forward
+  - from: treasury_bonds
+    to: investors
+    label: 本息承诺
+    type: fund_flow
+    direction: forward
+  - from: fed
+    to: investors
+    label: 利率预期
+    type: information
+    direction: forward
+  - from: fed
+    to: interest_rate_risk
+    label: 加息提高久期风险
+    type: causal
+    direction: forward
+  - from: interest_rate_risk
+    to: investors
+    label: 改变需求
+    type: causal
+    direction: forward
+
+loops:
+  - id: rate_demand_loop
+    label: 利率-需求反馈
+    nodes:
+      - fed
+      - interest_rate_risk
+      - investors
+      - auction
+    polarity: negative
+
+render:
+  style: default
+  show_loops: true
+  highlight_nodes:
+    - treasury
+    - treasury_bonds
+  highlight_edges: []
+  renderer: mermaid

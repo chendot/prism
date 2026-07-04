@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Generated render outputs
+examples/*.html
+prism.html
+prism.yaml
+findings.json

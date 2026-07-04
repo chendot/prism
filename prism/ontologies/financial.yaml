@@ -1,0 +1,68 @@
+name: financial
+description: 金融/DeFi/宏观系统
+
+roles:
+  issuer:
+    label_zh: 发行方
+    fill: "#DBEAFE"
+    stroke: "#93C5FD"
+  buyer:
+    label_zh: 购买方
+    fill: "#DCFCE7"
+    stroke: "#86EFAC"
+  regulator:
+    label_zh: 监管方
+    fill: "#EDE9FE"
+    stroke: "#C4B5FD"
+  intermediary:
+    label_zh: 中间商
+    fill: "#FEF9C3"
+    stroke: "#FDE047"
+  market:
+    label_zh: 市场机制
+    fill: "#F3F4F6"
+    stroke: "#D1D5DB"
+  risk:
+    label_zh: 风险节点
+    fill: "#FEE2E2"
+    stroke: "#FCA5A5"
+  asset:
+    label_zh: 资产
+    fill: "#E0F2FE"
+    stroke: "#7DD3FC"
+
+edge_types:
+  fund_flow:
+    label_zh: 资金流
+    color: "#16A34A"
+    style: solid
+  authorization:
+    label_zh: 授权
+    color: "#7C3AED"
+    style: solid
+  information:
+    label_zh: 信息
+    color: "#2563EB"
+    style: dashed
+  issuance:
+    label_zh: 发行
+    color: "#1D4ED8"
+    style: solid
+  causal:
+    label_zh: 因果
+    color: "#6B7280"
+    style: solid
+  feedback:
+    label_zh: 反馈
+    color: "#EA580C"
+    style: curved
+
+perspectives:
+  - name: 货币视角
+    focus: 货币供给、利率传导、通胀
+  - name: 财政视角
+    focus: 赤字、债务上限、国会博弈
+  - name: 市场视角
+    focus: 拍卖机制、一级交易商、流动性
+  - name: 地缘视角
+    focus: 外国央行持仓、美元体系

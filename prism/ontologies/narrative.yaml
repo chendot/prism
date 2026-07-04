@@ -1,0 +1,54 @@
+name: narrative
+description: 叙事/人物关系系统
+
+roles:
+  protagonist:
+    label_zh: 主角
+    fill: "#DBEAFE"
+    stroke: "#60A5FA"
+  antagonist:
+    label_zh: 对手
+    fill: "#FEE2E2"
+    stroke: "#F87171"
+  ally:
+    label_zh: 盟友
+    fill: "#DCFCE7"
+    stroke: "#4ADE80"
+  mentor:
+    label_zh: 导师
+    fill: "#EDE9FE"
+    stroke: "#A78BFA"
+  institution:
+    label_zh: 组织
+    fill: "#F3F4F6"
+    stroke: "#9CA3AF"
+
+edge_types:
+  trust:
+    label_zh: 信任
+    color: "#16A34A"
+    style: solid
+  conflict:
+    label_zh: 冲突
+    color: "#DC2626"
+    style: solid
+  betrayal:
+    label_zh: 背叛
+    color: "#EA580C"
+    style: dashed
+  influence:
+    label_zh: 影响
+    color: "#2563EB"
+    style: solid
+  kinship:
+    label_zh: 亲缘
+    color: "#9333EA"
+    style: solid
+
+perspectives:
+  - name: 人物动机
+    focus: 欲望、恐惧、关键选择
+  - name: 关系变化
+    focus: 信任、背叛、联盟、冲突
+  - name: 叙事功能
+    focus: 主线推动、反转、伏笔回收
