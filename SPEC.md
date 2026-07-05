@@ -46,14 +46,14 @@ render: {}
 - `edges[].from` 和 `edges[].to` 必须引用已有 node id。
 - `loops[]` 用于保留反馈循环，即使某些 renderer 不能原生表达。
 
-结构定义在 `prism/core/schema.py`，跨字段和 ontology 校验在 `prism/core/validator.py`。
+结构定义在 `src/prism/core/schema.py`，跨字段和 ontology 校验在 `src/prism/core/validator.py`。
 
 ## Ontology
 
 每个领域一个 YAML 文件：
 
 ```text
-prism/ontologies/<name>.yaml
+src/prism/ontologies/<name>.yaml
 ```
 
 必须包含：

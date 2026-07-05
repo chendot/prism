@@ -23,7 +23,7 @@ def list_ontologies() -> list[str]:
 
 
 def load_ontology(name: str) -> Ontology:
-    """Load an ontology by name from ``prism/ontologies``."""
+    """Load an ontology by name from ``src/prism/ontologies``."""
 
     path = ONTOLOGY_DIR / f"{name}.yaml"
     if not path.exists():

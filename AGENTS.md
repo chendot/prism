@@ -5,7 +5,7 @@
 ## 工作前先确认
 
 - 改 schema、validator、ontology、renderer 前先读 `SPEC.md`。
-- 不要把领域枚举写进 `prism/core/schema.py`。
+- 不要把领域枚举写进 `src/prism/core/schema.py`。
 - 不要让 renderer 依赖 research/compression 的内部状态。
 - 不要把生成物当成核心资产；核心资产始终是 `prism.yaml`。
 

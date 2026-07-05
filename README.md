@@ -39,12 +39,15 @@ prism ontologies
 
 ```text
 prism/
-├── core/          # prism.yaml schema、领域无关模型、validator
-├── research/      # Layer 1：可选研究层
-├── compression/   # Layer 2：topic/findings -> prism.yaml
-├── render/        # Layer 3：prism.yaml -> HTML/SVG/D3 等输出
-├── ontologies/    # 领域词表和视觉映射
-└── cli.py
+├── src/prism/
+│   ├── core/          # prism.yaml schema、领域无关模型、validator
+│   ├── research/      # Layer 1：可选研究层
+│   ├── compression/   # Layer 2：topic/findings -> prism.yaml
+│   ├── render/        # Layer 3：prism.yaml -> HTML/SVG/D3 等输出
+│   ├── ontologies/    # 领域词表和视觉映射
+│   └── cli.py
+├── examples/
+└── tests/
 ```
 
 ## 文档分工
