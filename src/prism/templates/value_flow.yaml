@@ -1,0 +1,28 @@
+name: value_flow
+description: 利益分配、资金流、权力转移、DeFi 或稳定币机制的解释结构。
+diagram:
+  type: flow
+  direction: LR
+constraints:
+  required_semantics:
+    - participants
+    - value_or_fund_flow
+    - benefit_or_cost_destination
+    - provider_start_node
+    - single_primary_weight_conflict_node
+  preferred_edge_meanings:
+    - fund_flow
+    - issuance
+    - authorization
+  node_count:
+    min: 8
+    max: 14
+  loop_required: false
+instructions:
+  - 明确谁提供资金、谁获得资产、谁承担风险、谁获得收益或控制权。
+  - 起点节点必须是资金/价值的提供方，例如用户、存款人或投资者；不能是监管机构、政策机构或外部约束方。
+  - 监管/政策类节点如果存在，必须标记 role: constraint；在 financial ontology 中也使用 constraint，不要使用 regulator。
+  - 监管/政策类节点放在图的边缘，并通过单向虚线边连接主链；它不能是第一项 nodes，也不能是零入度起点节点。
+  - 必须有且仅有一个节点标记 weight: primary；它代表利益分配矛盾点，即价值流动中存在不对等分配的环节。
+  - weight: primary 的典型节点包括储备利息、手续费、平台抽成等收益被一方占有但风险或成本由另一方承担的节点。
+  - 如果 ontology 没有 participant/flow/benefit/cost 这些字面 role，映射到最接近的合法 role。

@@ -18,6 +18,7 @@ class Ontology:
     description: str
     roles: dict[str, dict[str, Any]]
     edge_types: dict[str, dict[str, Any]]
+    weights: dict[str, dict[str, Any]]
     perspectives: list[dict[str, str]] = field(default_factory=list)
 
     def role_style(self, role: str) -> dict[str, Any]:
@@ -29,3 +30,8 @@ class Ontology:
         """Return visual metadata for an edge type, or an empty mapping."""
 
         return self.edge_types.get(edge_type, {})
+
+    def weight_style(self, weight: str) -> dict[str, Any]:
+        """Return visual metadata for a node weight, or an empty mapping."""
+
+        return self.weights.get(weight, {})

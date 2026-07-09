@@ -38,5 +38,6 @@ def load_ontology(name: str) -> Ontology:
         description=data.get("description", ""),
         roles=data.get("roles", {}),
         edge_types=data.get("edge_types", {}),
+        weights=data.get("weights", {}),
         perspectives=data.get("perspectives", []),
     )

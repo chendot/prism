@@ -1,0 +1,23 @@
+name: causal_chain
+description: 风险传导、市场周期、政策影响和因果链的解释结构。
+diagram:
+  type: flow
+  direction: LR
+constraints:
+  required_semantics:
+    - trigger
+    - transmission_steps
+    - outcome
+    - feedback_loop
+  preferred_edge_meanings:
+    - causal
+    - information
+    - fund_flow
+    - feedback
+  node_count:
+    min: 8
+    max: 16
+  loop_required: true
+instructions:
+  - 节点按从触发点到结果的传导顺序排列。
+  - 至少生成一个正反馈或负反馈 loop，用 loops 字段保存。

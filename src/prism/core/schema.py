@@ -85,6 +85,9 @@ class Meta(PrismBaseModel):
     subtitle: str | None = None
     topic: str
     ontology: str
+    template: str | None = None
+    visual_theme: str | None = "warm_layered"
+    target_format: str | None = None
     audience: Audience
     language: Language
     tags: list[str] = Field(default_factory=list)
@@ -105,6 +108,7 @@ class Node(PrismBaseModel):
     sublabel: str | None = None
     role: str
     layer: int | None = None
+    weight: str = "secondary"
 
     @field_validator("id")
     @classmethod

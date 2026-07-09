@@ -1,0 +1,21 @@
+name: layer_stack
+description: 系统架构、能力分层、软件工程或内容生产流程的解释结构。
+diagram:
+  type: layer
+  direction: TD
+constraints:
+  required_semantics:
+    - layers
+    - cross_layer_dependencies
+    - top_level_capability_or_output
+  preferred_edge_meanings:
+    - information
+    - causal
+    - authorization
+  node_count:
+    min: 6
+    max: 12
+  loop_required: false
+instructions:
+  - 每个 node 都要设置 layer，layer 数字越小越靠近基础层。
+  - 避免同层节点直接连边；同层关系放进 sublabel。

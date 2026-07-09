@@ -35,11 +35,22 @@ def validate_prism_doc(prism: PrismDoc, ontology: Ontology | None = None) -> Pri
     node_id_set = set(node_ids)
     role_names = set(ontology.roles)
     edge_type_names = set(ontology.edge_types)
+    weight_names = set(ontology.weights)
 
     invalid_roles = sorted({node.role for node in prism.nodes if node.role not in role_names})
     if invalid_roles:
         raise PrismValidationError(
             f"Unknown role(s) for ontology '{ontology.name}': {', '.join(invalid_roles)}"
+        )
+
+    invalid_weights = sorted(
+        {node.weight for node in prism.nodes if node.weight not in weight_names}
+    )
+    if invalid_weights:
+        available = ", ".join(sorted(weight_names)) or "none"
+        raise PrismValidationError(
+            f"Unknown node weight(s) for ontology '{ontology.name}': "
+            f"{', '.join(invalid_weights)}. Available weights: {available}"
         )
 
     for edge in prism.edges:

@@ -39,3 +39,35 @@ def test_schema_rejects_non_snake_case_node_id() -> None:
         assert "snake_case" in str(exc)
     else:
         raise AssertionError("Expected schema validation to fail")
+
+
+def test_schema_defaults_node_weight_to_secondary_without_enum_validation() -> None:
+    data = {
+        "meta": {
+            "title": "Weighted",
+            "topic": "Weighted",
+            "ontology": "financial",
+            "audience": "beginner",
+            "language": "en",
+            "tags": [],
+        },
+        "diagram": {"type": "flow", "direction": "LR"},
+        "nodes": [
+            {"id": "normal_node", "label": "Normal", "role": "asset"},
+            {"id": "custom_node", "label": "Custom", "role": "asset", "weight": "custom"},
+        ],
+        "edges": [],
+        "loops": [],
+        "render": {
+            "style": "default",
+            "show_loops": True,
+            "highlight_nodes": [],
+            "highlight_edges": [],
+            "renderer": "mermaid",
+        },
+    }
+
+    prism = PrismDoc.model_validate(data)
+
+    assert prism.nodes[0].weight == "secondary"
+    assert prism.nodes[1].weight == "custom"

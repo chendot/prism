@@ -1,0 +1,296 @@
+meta:
+  title: 稳定币是怎么赚钱的
+  subtitle: 法币型、加密抵押型、收益型三种盈利模式对比
+  topic: 稳定币盈利模式
+  ontology: financial
+  audience: intermediate
+  language: zh
+  tags:
+    - stablecoin
+    - revenue
+    - defi
+    - business_model
+
+diagram:
+  type: flow
+  direction: LR
+
+nodes:
+  # ── 共同起点 ──
+  - id: users
+    label: 用户
+    sublabel: 存入资金换取稳定币
+    role: buyer
+    weight: secondary
+
+  # ── 法币型 (USDT / USDC) ──
+  - id: fiat_issuer
+    label: 法币发行方
+    sublabel: USDT · USDC
+    role: issuer
+    weight: primary
+
+  - id: fiat_reserve
+    label: 储备资产
+    sublabel: 国债 / 货币基金 / 回购
+    role: asset
+    weight: secondary
+
+  - id: fiat_interest
+    label: 储备利息
+    sublabel: 利息全归发行方；用户零收益
+    role: market
+    weight: primary
+
+  - id: redeem_fee
+    label: 兑换手续费
+    sublabel: 大额赎回收 0.1%
+    role: market
+    weight: muted
+
+  # ── 加密抵押型 (DAI / crvUSD) ──
+  - id: cdp_issuer
+    label: 抵押协议
+    sublabel: DAI · crvUSD · MakerDAO
+    role: issuer
+    weight: primary
+
+  - id: collateral
+    label: 超额抵押品
+    sublabel: ETH / BTC，抵押率 150%+
+    role: asset
+    weight: secondary
+
+  - id: stability_fee
+    label: 稳定费（贷款利率）
+    sublabel: 借款人按年利率付息
+    role: market
+    weight: primary
+
+  - id: liquidation_penalty
+    label: 清算罚款
+    sublabel: 抵押不足强制清算，罚 13%
+    role: risk
+    weight: secondary
+
+  - id: gov_token
+    label: 治理代币分红
+    sublabel: MKR 持有者获协议利润
+    role: intermediary
+    weight: muted
+
+  # ── 收益型 (USDe / sUSDe) ──
+  - id: yield_issuer
+    label: 收益发行方
+    sublabel: Ethena USDe · sUSDe
+    role: issuer
+    weight: primary
+
+  - id: delta_neutral
+    label: Delta 中性仓位
+    sublabel: 现货多头 + 永续空头对冲
+    role: asset
+    weight: secondary
+
+  - id: funding_rate
+    label: 资金费率收入
+    sublabel: 多头向空头付费；牛市年化 20%+
+    role: market
+    weight: primary
+
+  - id: staking_yield
+    label: 质押收益分配
+    sublabel: 协议抽成后余额给 sUSDe 持有者
+    role: market
+    weight: secondary
+
+  # ── 共同风险 ──
+  - id: regulation
+    label: 监管约束
+    sublabel: 储备披露 / 利息归属限制
+    role: constraint
+    weight: muted
+
+  - id: systemic_risk
+    label: 系统性风险
+    sublabel: 挤兑 / 级联清算 / 资金费转负
+    role: risk
+    weight: muted
+
+edges:
+  # 用户 → 各发行方
+  - from: users
+    to: fiat_issuer
+    label: 存入法币
+    type: fund_flow
+    direction: forward
+
+  - from: users
+    to: cdp_issuer
+    label: 存入加密资产
+    type: fund_flow
+    direction: forward
+
+  - from: users
+    to: yield_issuer
+    label: 存入 USDC/ETH
+    type: fund_flow
+    direction: forward
+
+  # 法币型盈利链
+  - from: fiat_issuer
+    to: fiat_reserve
+    label: 配置储备
+    type: fund_flow
+    direction: forward
+
+  - from: fiat_reserve
+    to: fiat_interest
+    label: 产生利息
+    type: fund_flow
+    direction: forward
+
+  - from: fiat_interest
+    to: fiat_issuer
+    label: 收益归发行方
+    type: fund_flow
+    direction: forward
+
+  - from: users
+    to: redeem_fee
+    label: 赎回时收费
+    type: fund_flow
+    direction: forward
+
+  - from: redeem_fee
+    to: fiat_issuer
+    label: 手续费归发行方
+    type: fund_flow
+    direction: forward
+
+  # 加密抵押型盈利链
+  - from: cdp_issuer
+    to: collateral
+    label: 锁定抵押品
+    type: issuance
+    direction: forward
+
+  - from: users
+    to: stability_fee
+    label: 借款年利率付息
+    type: fund_flow
+    direction: forward
+
+  - from: stability_fee
+    to: cdp_issuer
+    label: 协议收入
+    type: fund_flow
+    direction: forward
+
+  - from: collateral
+    to: liquidation_penalty
+    label: 抵押不足触发清算
+    type: causal
+    direction: forward
+
+  - from: liquidation_penalty
+    to: cdp_issuer
+    label: 罚款归协议
+    type: fund_flow
+    direction: forward
+
+  - from: cdp_issuer
+    to: gov_token
+    label: 利润分配给治理代币
+    type: fund_flow
+    direction: forward
+
+  # 收益型盈利链
+  - from: yield_issuer
+    to: delta_neutral
+    label: 构建对冲仓位
+    type: fund_flow
+    direction: forward
+
+  - from: delta_neutral
+    to: funding_rate
+    label: 收取资金费
+    type: fund_flow
+    direction: forward
+
+  - from: funding_rate
+    to: yield_issuer
+    label: 协议抽成
+    type: fund_flow
+    direction: forward
+
+  - from: funding_rate
+    to: staking_yield
+    label: 余额给质押用户
+    type: fund_flow
+    direction: forward
+
+  - from: staking_yield
+    to: users
+    label: 用户也能分收益
+    type: fund_flow
+    direction: forward
+
+  # 风险与监管
+  - from: regulation
+    to: fiat_issuer
+    label: 约束储备披露
+    type: authorization
+    direction: forward
+
+  - from: regulation
+    to: fiat_interest
+    label: 影响利息归属
+    type: authorization
+    direction: forward
+
+  - from: systemic_risk
+    to: users
+    label: 风险最终由持有者承担
+    type: causal
+    direction: forward
+
+  - from: liquidation_penalty
+    to: systemic_risk
+    label: 级联清算加剧系统风险
+    type: causal
+    direction: forward
+
+  - from: delta_neutral
+    to: systemic_risk
+    label: 资金费转负时承压
+    type: causal
+    direction: forward
+
+loops:
+  - id: interest_rate_loop
+    label: 利率-储备收益正反馈
+    nodes:
+      - fiat_reserve
+      - fiat_interest
+      - fiat_issuer
+    polarity: positive
+
+  - id: liquidation_spiral
+    label: 清算螺旋
+    nodes:
+      - collateral
+      - liquidation_penalty
+      - systemic_risk
+      - users
+    polarity: negative
+
+render:
+  style: default
+  show_loops: true
+  highlight_nodes:
+    - fiat_interest
+    - stability_fee
+    - funding_rate
+  highlight_edges: []
+  renderer: mermaid

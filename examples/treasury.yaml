@@ -19,30 +19,37 @@ nodes:
     label: 美国财政部
     sublabel: 发行国债以筹集财政资金
     role: issuer
+    weight: secondary
   - id: auction
     label: 国债拍卖
     sublabel: 决定发行价格与收益率
     role: market
+    weight: secondary
   - id: primary_dealers
     label: 一级交易商
     sublabel: 承销并提供市场流动性
     role: intermediary
+    weight: secondary
   - id: investors
     label: 投资者
     sublabel: 机构、个人、外国央行
     role: buyer
+    weight: secondary
   - id: fed
     label: 美联储
     sublabel: 通过货币政策影响利率环境
     role: regulator
+    weight: muted
   - id: treasury_bonds
     label: 美国国债
     sublabel: 政府信用支持的债务资产
     role: asset
+    weight: primary
   - id: interest_rate_risk
     label: 利率风险
     sublabel: 利率上行会压低既有债券价格
     role: risk
+    weight: muted
 
 edges:
   - from: treasury

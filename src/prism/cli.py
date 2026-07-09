@@ -9,16 +9,16 @@ from typing import Any
 import typer
 
 from prism.compression.compressor import PlaceholderCompressor
+from prism.compression.llm_compressor import LLMCompressor
 from prism.core.schema import PrismDoc, RendererName
 from prism.core.validator import validate_prism_file
 from prism.ontologies.loader import list_ontologies, load_ontology
 from prism.render.base import Renderer
-from prism.render.d3 import D3Renderer
 from prism.render.mermaid import MermaidRenderer
-from prism.render.svg import SvgRenderer
 from prism.research.engine import PlaceholderResearchEngine
 
 app = typer.Typer(help="Prism visual explanation system.")
+DEFAULT_OUTPUT_DIR = Path("outputs")
 
 
 def get_renderer(name: RendererName) -> Renderer:
@@ -27,9 +27,9 @@ def get_renderer(name: RendererName) -> Renderer:
     if name == RendererName.MERMAID:
         return MermaidRenderer()
     if name == RendererName.SVG:
-        return SvgRenderer()
+        raise typer.BadParameter("Renderer 'svg' is planned but not implemented yet.")
     if name == RendererName.D3:
-        return D3Renderer()
+        raise typer.BadParameter("Renderer 'd3' is planned but not implemented yet.")
     raise typer.BadParameter(f"Unknown renderer: {name}")
 
 
@@ -69,13 +69,14 @@ def render(file: Path, output: Path | None = typer.Option(None, "--output", "-o"
 def compress(
     topic: str,
     ontology: str = typer.Option("financial", "--ontology"),
+    llm_provider: str = typer.Option("codex", "--llm-provider"),
     output: Path | None = typer.Option(None, "--output", "-o"),
 ) -> None:
     """Run Layer 2 only: topic to validated prism.yaml."""
 
     loaded_ontology = load_ontology(ontology)
-    prism = PlaceholderCompressor().compress(topic, None, loaded_ontology)
-    output = output or Path("prism.yaml")
+    prism = LLMCompressor(provider=llm_provider).compress(topic, None, loaded_ontology)
+    output = output or DEFAULT_OUTPUT_DIR / "prism.yaml"
     write_text(output, prism.to_yaml())
     typer.echo(f"Wrote: {output}")
 
@@ -90,7 +91,7 @@ def research(
 
     loaded_ontology = load_ontology(ontology)
     findings = PlaceholderResearchEngine().research(topic, loaded_ontology)
-    output = output or Path("findings.json")
+    output = output or DEFAULT_OUTPUT_DIR / "findings.json"
     write_text(output, json.dumps(findings, ensure_ascii=False, indent=2))
     typer.echo(f"Wrote: {output}")
 
@@ -99,8 +100,10 @@ def research(
 def run(
     topic: str,
     ontology: str = typer.Option("financial", "--ontology"),
+    llm_provider: str = typer.Option("codex", "--llm-provider"),
     skip_research: bool = typer.Option(False, "--skip-research"),
-    output_dir: Path = typer.Option(Path("."), "--output-dir"),
+    placeholder: bool = typer.Option(False, "--placeholder"),
+    output_dir: Path = typer.Option(DEFAULT_OUTPUT_DIR, "--output-dir"),
 ) -> None:
     """Run research, compression, and render as one workflow."""
 
@@ -110,7 +113,12 @@ def run(
         findings = PlaceholderResearchEngine().research(topic, loaded_ontology)
         write_text(output_dir / "findings.json", json.dumps(findings, ensure_ascii=False, indent=2))
 
-    prism = PlaceholderCompressor().compress(topic, findings, loaded_ontology)
+    compressor = (
+        PlaceholderCompressor()
+        if placeholder
+        else LLMCompressor(provider=llm_provider)
+    )
+    prism = compressor.compress(topic, findings, loaded_ontology)
     yaml_path = write_text(output_dir / "prism.yaml", prism.to_yaml())
 
     renderer = get_renderer(prism.render.renderer)
