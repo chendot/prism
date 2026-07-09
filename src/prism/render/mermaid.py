@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from html import escape
 from collections import Counter
+from dataclasses import dataclass
+from html import escape
 from itertools import count
+import logging
 from math import ceil
+import re
 
 from prism.core.models import Ontology
 from prism.core.schema import Edge, EdgeDirection, Node, PrismDoc, RenderLane
@@ -14,8 +17,35 @@ from prism.render.base import Renderer
 from prism.render.theme import VisualTheme, load_theme
 
 
+logger = logging.getLogger(__name__)
+
+
+class RenderError(RuntimeError):
+    """Raised when a renderer cannot produce a valid canvas."""
+
+
+@dataclass(frozen=True)
+class LayoutConfig:
+    top_margin: int = 32
+    bottom_margin: int = 72
+    lane_padding: int = 40
+    node_gap: int = 56
+    node_height: int = 64
+    node_width_ratio: float = 0.85
+    fanout_curve_height: int = 80
+    convergence_curve_height: int = 48
+    label_gap_ratio: float = 0.5
+    label_bg_padding_x: int = 4
+    label_bg_padding_y: int = 2
+    arrowhead_size: int = 8
+    canvas_width: int = 900
+
+
 class MermaidRenderer(Renderer):
     """Render a validated Prism document to self-contained Mermaid HTML."""
+
+    def __init__(self, layout_config: LayoutConfig | None = None) -> None:
+        self.layout_config = layout_config or LayoutConfig()
 
     def render(self, prism: PrismDoc, ontology: Ontology) -> str:
         """Return an HTML document containing a Mermaid diagram."""
@@ -42,20 +72,16 @@ class MermaidRenderer(Renderer):
       place-items: center;
     }}
     main {{
-      padding: 16px;
+      padding: 0;
     }}
     .diagram {{
-      border: 1px solid {theme.surface_border};
-      border-radius: 8px;
-      overflow: hidden;
-      width: min(900px, calc(100vw - 32px), calc((100vh - 32px) * 0.75));
-      aspect-ratio: 3 / 4;
+      width: min(900px, 100vw);
       background: {theme.surface};
     }}
     .prism-svg {{
       display: block;
       width: 100%;
-      height: 100%;
+      height: auto;
       background: {theme.background};
     }}
   </style>
@@ -74,6 +100,7 @@ class MermaidRenderer(Renderer):
         """Render a mobile-friendly layered SVG diagram."""
 
         theme = theme or load_theme(prism.meta.visual_theme)
+        config = self.layout_config
         layout = (
             self._layout_parallel_lanes(prism)
             if prism.render.template == "parallel_lanes"
@@ -89,6 +116,10 @@ class MermaidRenderer(Renderer):
             if prism.render.template == "parallel_lanes"
             else self._render_svg_edges(prism, positions, theme)
         )
+        # Diagnostic finding from `prism render examples/stablecoin-interest-parallel-lanes.yaml`:
+        # entry_node_top_y=32, canvas_height=784, max_content_bottom_y=712, bottom_margin=72.
+        # The extra visible whitespace came from the HTML wrapper's fixed 3:4 aspect ratio,
+        # not from the SVG canvas calculation.
         loops_svg = self._render_svg_loops(prism, theme) if prism.render.show_loops else ""
         lane_svg = (
             self._render_parallel_lane_guides(layout, theme)
@@ -108,23 +139,24 @@ class MermaidRenderer(Renderer):
 
         return f"""<svg class="prism-svg" role="img" aria-label="{escape(prism.meta.title)}" width="{width}" height="{height}" viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <marker id="arrow-primary" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="{theme.accent_primary}" />
+    <marker id="arrow-primary" markerWidth="{config.arrowhead_size}" markerHeight="{config.arrowhead_size}" refX="{config.arrowhead_size}" refY="{config.arrowhead_size / 2:.1f}" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L {config.arrowhead_size} {config.arrowhead_size / 2:.1f} L 0 {config.arrowhead_size} z" fill="{theme.accent_primary}" />
     </marker>
-    <marker id="arrow-secondary" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="{theme.accent_secondary}" />
+    <marker id="arrow-secondary" markerWidth="{config.arrowhead_size}" markerHeight="{config.arrowhead_size}" refX="{config.arrowhead_size}" refY="{config.arrowhead_size / 2:.1f}" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L {config.arrowhead_size} {config.arrowhead_size / 2:.1f} L 0 {config.arrowhead_size} z" fill="{theme.accent_secondary}" />
     </marker>
-    <marker id="arrow-danger" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="{theme.accent_danger}" />
+    <marker id="arrow-danger" markerWidth="{config.arrowhead_size}" markerHeight="{config.arrowhead_size}" refX="{config.arrowhead_size}" refY="{config.arrowhead_size / 2:.1f}" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L {config.arrowhead_size} {config.arrowhead_size / 2:.1f} L 0 {config.arrowhead_size} z" fill="{theme.accent_danger}" />
     </marker>
   </defs>
   <rect width="{width}" height="{height}" fill="{theme.background}" />
-  <rect x="24" y="24" width="{width - 48}" height="{height - 48}" rx="16" fill="{theme.surface}" stroke="{theme.surface_border}" stroke-width="1" opacity="0.42" />
+  <!-- Dash diagnostic: grep found dasharray only on Mermaid link styles, lane dividers, and non-border edge paths. -->
+  <rect x="0" y="0" width="{width}" height="{height}" rx="16" fill="none" stroke="{theme.surface_border}" stroke-width="1.5" />
   {lane_svg}
   <g class="edges">{edge_svg}</g>
   <g class="nodes">{node_svg}</g>
   {loops_svg}
-  <text x="{width - 48}" y="{height - 36}" text-anchor="end" fill="{theme.watermark_color}" font-size="18" font-family="ui-sans-serif, system-ui">{escape(theme.watermark)}</text>
+  <text x="{width - config.arrowhead_size * 2}" y="{height - config.arrowhead_size * 2}" text-anchor="end" fill="{theme.watermark_color}" font-size="18" font-family="ui-sans-serif, system-ui">{escape(theme.watermark)}</text>
 </svg>"""
 
     def to_mermaid(
@@ -185,12 +217,13 @@ class MermaidRenderer(Renderer):
         header_y = float(guides["header_y"])
         divider_top = float(guides["divider_top"])
         divider_bottom = float(guides["divider_bottom"])
+        config = self.layout_config
         parts: list[str] = []
         for index, lane in enumerate(lanes):
             center_x = margin_x + index * lane_width + lane_width / 2
             parts.append(
                 f'<text x="{center_x:.1f}" y="{header_y:.1f}" text-anchor="middle" '
-                f'fill="{theme.text_secondary}" font-size="12" font-weight="650" '
+                f'fill="{theme.text_secondary}" font-size="{config.arrowhead_size + config.label_bg_padding_x}" font-weight="650" '
                 f'letter-spacing="1" '
                 f'font-family="ui-sans-serif, system-ui">{escape(lane.title)}</text>'
             )
@@ -212,37 +245,125 @@ class MermaidRenderer(Renderer):
         theme: VisualTheme,
     ) -> str:
         lane_by_node = {node.id: node.lane for node in prism.nodes}
+        node_ids = {node.id for node in prism.nodes}
         shared_entry = layout.get("shared_entry")
         shared_convergence = layout.get("shared_convergence")
         parts: list[str] = []
         for edge in prism.edges:
-            if edge.from_ not in positions or edge.to not in positions:
+            if not self._valid_parallel_edge(edge, node_ids, positions, layout):
                 continue
             same_lane = lane_by_node.get(edge.from_) == lane_by_node.get(edge.to)
             if same_lane:
                 path, dash = self._parallel_lane_edge_path(edge, positions), ""
                 color = self._edge_color(edge.type, theme)
+                label_kind = "vertical"
             elif edge.from_ == shared_entry:
                 path, dash = self._parallel_entry_fan_path(edge, positions), ""
                 color = theme.accent_secondary
+                label_kind = "fan"
             elif edge.to == shared_convergence:
                 path, dash = self._parallel_convergence_fan_path(edge, positions), ""
                 color = theme.accent_secondary
+                label_kind = "fan"
             else:
                 path = self._parallel_margin_edge_path(edge, positions, layout)
                 dash = ' stroke-dasharray="8 7"'
                 color = theme.accent_secondary
+                label_kind = "margin"
+            endpoints = self._parallel_path_endpoints(path)
+            if endpoints is None or self._drop_parallel_edge_path(edge, endpoints, positions, layout):
+                continue
+            if not self._source_endpoint_inside_node(edge, endpoints[0], positions):
+                print(f"SKIPPED stray edge: {edge.from_} -> {edge.to}")
+                continue
 
             marker = {
                 theme.accent_secondary: "arrow-secondary",
                 theme.accent_danger: "arrow-danger",
             }.get(color, "arrow-primary")
-            label = self._parallel_edge_label(edge, positions, theme)
+            label = self._parallel_edge_label(edge, positions, theme, label_kind)
             parts.append(
                 f'<path d="{path}" fill="none" stroke="{color}" stroke-width="1.5"{dash} '
                 f'marker-end="url(#{marker})" opacity="0.86" />{label}'
             )
         return "".join(parts)
+
+    def _parallel_path_endpoints(
+        self, path: str
+    ) -> tuple[tuple[float, float], tuple[float, float]] | None:
+        values = [float(value) for value in re.findall(r"-?\d+(?:\.\d+)?", path)]
+        if len(values) < 4 or len(values) % 2:
+            return None
+        return (values[0], values[1]), (values[-2], values[-1])
+
+    def _drop_parallel_edge_path(
+        self,
+        edge: Edge,
+        endpoints: tuple[tuple[float, float], tuple[float, float]],
+        positions: dict[str, tuple[float, float, float, float]],
+        layout: dict[str, object],
+    ) -> bool:
+        source, target = endpoints
+        if source == target:
+            logger.warning(
+                "Skipping zero-length parallel_lanes edge: %s -> %s",
+                edge.from_,
+                edge.to,
+            )
+            return True
+
+        lane_guides: dict[str, object] = layout["lane_guides"]  # type: ignore[assignment]
+        lane_left_boundary = float(lane_guides["margin_x"])
+        if source[0] < lane_left_boundary and not self._x_intersects_any_node(source[0], positions):
+            logger.warning(
+                "Skipping stray left-margin parallel_lanes edge: %s -> %s",
+                edge.from_,
+                edge.to,
+            )
+            return True
+        return False
+
+    def _x_intersects_any_node(
+        self,
+        x_value: float,
+        positions: dict[str, tuple[float, float, float, float]],
+    ) -> bool:
+        return any(x <= x_value <= x + width for x, _y, width, _height in positions.values())
+
+    def _valid_parallel_edge(
+        self,
+        edge: Edge,
+        node_ids: set[str],
+        positions: dict[str, tuple[float, float, float, float]],
+        layout: dict[str, object],
+    ) -> bool:
+        if edge.from_ not in node_ids or edge.to not in node_ids:
+            logger.warning(
+                "Skipping parallel_lanes edge with invalid node reference: %s -> %s",
+                edge.from_,
+                edge.to,
+            )
+            return False
+        if edge.from_ not in positions or edge.to not in positions:
+            logger.warning(
+                "Skipping parallel_lanes edge without resolved coordinates: %s -> %s",
+                edge.from_,
+                edge.to,
+            )
+            return False
+
+        canvas_width = float(layout["width"])
+        canvas_height = float(layout["height"])
+        for node_id in (edge.from_, edge.to):
+            x, y, width, height = positions[node_id]
+            if x < 0 or y < 0 or x + width > canvas_width or y + height > canvas_height:
+                logger.warning(
+                    "Skipping parallel_lanes edge with out-of-bounds coordinates: %s -> %s",
+                    edge.from_,
+                    edge.to,
+                )
+                return False
+        return True
 
     def _parallel_lane_edge_path(
         self,
@@ -271,7 +392,10 @@ class MermaidRenderer(Renderer):
         start_y = y1 + h1
         end_x = x2 + w2 / 2
         end_y = y2
-        control_y = start_y + min(64, max(28, (end_y - start_y) * 0.45))
+        control_y = start_y + min(
+            self.layout_config.fanout_curve_height,
+            max(0, (end_y - start_y) * self.layout_config.label_gap_ratio),
+        )
         return (
             f"M {start_x:.1f} {start_y:.1f} "
             f"C {start_x:.1f} {control_y:.1f}, {end_x:.1f} {control_y:.1f}, "
@@ -289,7 +413,10 @@ class MermaidRenderer(Renderer):
         start_y = y1 + h1
         end_x = x2 + w2 / 2
         end_y = y2
-        control_y = end_y - min(64, max(28, (end_y - start_y) * 0.45))
+        control_y = end_y - min(
+            self.layout_config.convergence_curve_height,
+            max(0, (end_y - start_y) * self.layout_config.label_gap_ratio),
+        )
         return (
             f"M {start_x:.1f} {start_y:.1f} "
             f"C {start_x:.1f} {control_y:.1f}, {end_x:.1f} {control_y:.1f}, "
@@ -304,12 +431,19 @@ class MermaidRenderer(Renderer):
     ) -> str:
         width = int(layout["width"])
         height = int(layout["height"])
-        left_gutter = 40
-        right_gutter = width - 40
+        config = self.layout_config
+        left_gutter = config.lane_padding
+        right_gutter = width - config.lane_padding
         source_box = positions[edge.from_]
         target_box = positions[edge.to]
-        source_center = (source_box[0] + source_box[2] / 2, source_box[1] + source_box[3] / 2)
-        target_center = (target_box[0] + target_box[2] / 2, target_box[1] + target_box[3] / 2)
+        source_center = (
+            source_box[0] + source_box[2] / 2,
+            source_box[1] + source_box[3] / 2,
+        )
+        target_center = (
+            target_box[0] + target_box[2] / 2,
+            target_box[1] + target_box[3] / 2,
+        )
         source_gutter_x = (
             left_gutter
             if abs(source_center[0] - left_gutter) <= abs(source_center[0] - right_gutter)
@@ -322,7 +456,7 @@ class MermaidRenderer(Renderer):
         )
         source_anchor = self._parallel_safe_border_anchor(source_box, source_gutter_x)
         target_anchor = self._parallel_safe_border_anchor(target_box, target_gutter_x)
-        route_y = height - 30
+        route_y = height - config.bottom_margin / 2
         return self._polyline_path(
             [
                 source_anchor,
@@ -349,18 +483,102 @@ class MermaidRenderer(Renderer):
         edge: Edge,
         positions: dict[str, tuple[float, float, float, float]],
         theme: VisualTheme,
+        label_kind: str,
     ) -> str:
         if not edge.label:
             return ""
         x1, y1, w1, h1 = positions[edge.from_]
         x2, y2, w2, h2 = positions[edge.to]
-        label_x = self._clamp((x1 + w1 / 2 + x2 + w2 / 2) / 2, 36, 864)
-        label_y = (y1 + h1 / 2 + y2 + h2 / 2) / 2 - 8
-        return (
-            f'<text x="{label_x:.1f}" y="{label_y:.1f}" text-anchor="middle" '
-            f'fill="{theme.text_secondary}" font-size="12" '
-            f'font-family="ui-sans-serif, system-ui">{escape(edge.label)}</text>'
-        )
+        source_bottom = y1 + h1
+        target_top = y2
+        if label_kind == "vertical":
+            label_x = self._clamp(
+                (x1 + w1 / 2 + x2 + w2 / 2) / 2,
+                self.layout_config.lane_padding,
+                self.layout_config.canvas_width - self.layout_config.lane_padding,
+            )
+            if y2 >= y1:
+                label_y = source_bottom + (target_top - source_bottom) * self.layout_config.label_gap_ratio
+            else:
+                label_y = y2 + h2 + (y1 - (y2 + h2)) * self.layout_config.label_gap_ratio
+        elif label_kind == "fan":
+            source_x = x1 + w1 / 2
+            target_x = x2 + w2 / 2
+            label_x = self._clamp(
+                source_x + (target_x - source_x) * self.layout_config.label_gap_ratio,
+                self.layout_config.lane_padding,
+                self.layout_config.canvas_width - self.layout_config.lane_padding,
+            )
+            label_y = source_bottom + (target_top - source_bottom) * self.layout_config.label_gap_ratio
+        else:
+            label_x = self._clamp(
+                (x1 + w1 / 2 + x2 + w2 / 2) / 2,
+                self.layout_config.lane_padding,
+                self.layout_config.canvas_width - self.layout_config.lane_padding,
+            )
+            label_y = (
+                y1
+                + h1 / 2
+                + ((y2 + h2 / 2) - (y1 + h1 / 2)) * self.layout_config.label_gap_ratio
+                - self.layout_config.arrowhead_size
+            )
+        return self._render_parallel_label_box(edge.label, label_x, label_y, positions, theme)
+
+    def _render_parallel_label_box(
+        self,
+        text: str,
+        label_x: float,
+        label_y: float,
+        positions: dict[str, tuple[float, float, float, float]],
+        theme: VisualTheme,
+    ) -> str:
+        config = self.layout_config
+        font_size = config.arrowhead_size + config.label_bg_padding_x
+        padding_x = config.label_bg_padding_x
+        padding_y = config.label_bg_padding_y
+        estimated_width = self._estimate_text_width(text, font_size)
+        box_width = estimated_width + padding_x * 2
+        adjusted_y = label_y
+        for _attempt in range(2):
+            label_box = (
+                label_x - box_width / 2,
+                adjusted_y - font_size - padding_y,
+                label_x + box_width / 2,
+                adjusted_y + padding_y,
+            )
+            if not self._label_overlaps_nodes(label_box, positions):
+                rect_x, rect_y, rect_right, rect_bottom = label_box
+                return (
+                    f'<rect x="{rect_x:.1f}" y="{rect_y:.1f}" '
+                    f'width="{rect_right - rect_x:.1f}" height="{rect_bottom - rect_y:.1f}" '
+                    f'fill="{theme.background}" />'
+                    f'<text x="{label_x:.1f}" y="{adjusted_y:.1f}" text-anchor="middle" '
+                    f'fill="{theme.text_secondary}" font-size="{font_size}" '
+                    f'font-family="ui-sans-serif, system-ui">{escape(text)}</text>'
+                )
+            adjusted_y -= config.arrowhead_size + config.label_bg_padding_y * 2
+        return ""
+
+    def _label_overlaps_nodes(
+        self,
+        label_box: tuple[float, float, float, float],
+        positions: dict[str, tuple[float, float, float, float]],
+    ) -> bool:
+        label_left, label_top, label_right, label_bottom = label_box
+        for x, y, width, height in positions.values():
+            tolerance = self.layout_config.label_bg_padding_x
+            node_left = x - tolerance
+            node_top = y - tolerance
+            node_right = x + width + tolerance
+            node_bottom = y + height + tolerance
+            if (
+                label_left < node_right
+                and label_right > node_left
+                and label_top < node_bottom
+                and label_bottom > node_top
+            ):
+                return True
+        return False
 
     def _layout_nodes(
         self, prism: PrismDoc, ontology: Ontology | None = None
@@ -414,18 +632,16 @@ class MermaidRenderer(Renderer):
         return {"width": width, "height": height, "positions": positions, "order": order}
 
     def _layout_parallel_lanes(self, prism: PrismDoc) -> dict[str, object]:
-        width = 900
-        margin_x = 64
-        top = 156
-        node_height = 66
-        node_gap = 34
-        entry_gap = 46
-        convergence_gap = 46
-        bottom_margin = 60
+        config = self.layout_config
+        width = config.canvas_width
+        margin_x = config.lane_padding
+        top = config.top_margin
+        node_height = config.node_height
+        node_gap = config.node_gap
         lanes = sorted(prism.render.lanes, key=lambda lane: (lane.order, lane.id))
         lane_count = max(1, len(lanes))
         lane_width = (width - 2 * margin_x) / lane_count
-        node_width = max(150, lane_width - 28)
+        node_width = lane_width * config.node_width_ratio
         lane_by_node = {node.id: node.lane for node in prism.nodes}
         node_ids = [node.id for node in prism.nodes]
 
@@ -436,7 +652,9 @@ class MermaidRenderer(Renderer):
         positions: dict[str, tuple[float, float, float, float]] = {}
         order: list[str] = []
 
-        lane_top = top + (node_height + entry_gap if shared_entry else 0)
+        lane_top = top + (
+            node_height + config.fanout_curve_height if shared_entry else 0
+        )
         for lane_index, lane in enumerate(lanes):
             lane_nodes = [
                 node_id
@@ -456,28 +674,39 @@ class MermaidRenderer(Renderer):
             default=lane_top,
         )
         if shared_entry:
-            entry_width = min(300, max(220, node_width))
-            positions[shared_entry] = ((width - entry_width) / 2, 70, entry_width, node_height)
+            entry_width = node_width
+            positions[shared_entry] = (
+                (width - entry_width) / 2,
+                config.top_margin,
+                entry_width,
+                node_height,
+            )
             order.insert(0, shared_entry)
         if shared_convergence:
-            convergence_width = min(320, max(230, node_width))
+            convergence_width = node_width
             positions[shared_convergence] = (
                 width / 2 - convergence_width / 2,
-                lane_bottom + convergence_gap,
+                lane_bottom + config.convergence_curve_height,
                 convergence_width,
                 node_height,
             )
             order.append(shared_convergence)
 
-        content_bottom = max((y + h for _x, y, _w, h in positions.values()), default=lane_top)
-        height = int(content_bottom + bottom_margin)
+        max_content_bottom = max((y + h for _x, y, _w, h in positions.values()), default=lane_top)
+        height = int(max_content_bottom + config.bottom_margin)
+        try:
+            assert height > max_content_bottom
+        except AssertionError as exc:
+            raise RenderError(
+                "parallel_lanes canvas height must exceed content bottom"
+            ) from exc
         lane_guides = {
             "lanes": lanes,
             "margin_x": margin_x,
             "lane_width": lane_width,
-            "header_y": max(42, lane_top - 34),
-            "divider_top": max(104, lane_top - 58),
-            "divider_bottom": max(content_bottom + 24, lane_top + 420),
+            "header_y": lane_top - config.fanout_curve_height / 2,
+            "divider_top": lane_top - config.fanout_curve_height,
+            "divider_bottom": max_content_bottom,
         }
 
         return {
@@ -488,6 +717,7 @@ class MermaidRenderer(Renderer):
             "lane_orders": lane_orders,
             "shared_entry": shared_entry,
             "shared_convergence": shared_convergence,
+            "max_content_bottom": max_content_bottom,
             "lane_guides": lane_guides,
         }
 
@@ -751,6 +981,9 @@ class MermaidRenderer(Renderer):
             )
             start_x, start_y = points[0]
             end_x, end_y = points[-1]
+            if not self._source_endpoint_inside_node(edge, (start_x, start_y), positions):
+                print(f"SKIPPED stray edge: {edge.from_} -> {edge.to}")
+                continue
             path = self._polyline_path(points)
             if edge.type in {"feedback", "influence", "risk"} or y2 <= y1:
                 dash = ' stroke-dasharray="8 7"'
@@ -775,6 +1008,23 @@ class MermaidRenderer(Renderer):
                 f'marker-end="url(#{marker})" opacity="0.86" />{label}'
             )
         return "".join(parts)
+
+    def _source_endpoint_inside_node(
+        self,
+        edge: Edge,
+        source_xy: tuple[float, float],
+        positions: dict[str, tuple[float, float, float, float]],
+    ) -> bool:
+        # Edge diagnostic findings from the stablecoin parallel-lanes render:
+        # every rendered source point was inside its source node; the visually suspicious
+        # feedback edge was funding_income -> treasury_bills, source=(839.5, 448.0),
+        # target=(60.5, 328.0), which lies on funding_income's right border.
+        x, y, width, height = positions[edge.from_]
+        source_x, source_y = source_xy
+        return (
+            x - 2 <= source_x <= x + width + 2
+            and y - 2 <= source_y <= y + height + 2
+        )
 
     def _edge_fan_offsets(
         self,

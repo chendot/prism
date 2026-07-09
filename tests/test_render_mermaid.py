@@ -1,6 +1,6 @@
 import re
 
-from prism.core.schema import PrismDoc
+from prism.core.schema import Edge, PrismDoc
 from prism.ontologies.loader import load_ontology
 from prism.render.mermaid import MermaidRenderer
 from prism.render.theme import load_theme
@@ -15,8 +15,8 @@ def test_mermaid_renderer_includes_styles_and_loops() -> None:
     assert 'width="900" height="1200"' in html
     assert 'viewBox="0 0 900 1200"' in html
     assert "width: min(900px" in html
-    assert "aspect-ratio: 3 / 4" in html
-    assert "overflow: hidden" in html
+    assert "aspect-ratio: 3 / 4" not in html
+    assert "height: auto" in html
     assert "美国财政部" in html
     assert "background: #1c1612" in html
     assert 'class="prism-node-accent"' in html
@@ -527,6 +527,10 @@ def test_parallel_lanes_layout_stacks_nodes_by_lane() -> None:
     assert positions["interest_allocation"][1] > positions["issuer_capture"][1]
     convergence_x, _y, convergence_width, _height = positions["interest_allocation"]
     assert convergence_x + convergence_width / 2 == layout["width"] / 2
+    assert positions["stablecoin_users"][1] == renderer.layout_config.top_margin
+    assert positions["treasury_bills"][1] - (
+        positions["cash_reserve"][1] + positions["cash_reserve"][3]
+    ) == 56
 
 
 def test_parallel_lanes_height_follows_content_bottom() -> None:
@@ -534,9 +538,9 @@ def test_parallel_lanes_height_follows_content_bottom() -> None:
     renderer = MermaidRenderer()
     layout = renderer._layout_parallel_lanes(prism)
     positions = layout["positions"]
-    content_bottom = max(y + height for _x, y, _width, height in positions.values())
-
-    assert layout["height"] == int(content_bottom + 60)
+    assert layout["height"] == int(
+        layout["max_content_bottom"] + renderer.layout_config.bottom_margin
+    )
     assert layout["height"] < 1200
 
 
@@ -554,10 +558,22 @@ def test_parallel_lanes_render_guides_and_margin_feedback_route() -> None:
     assert "法币储备" in svg
     assert "抵押借贷" in svg
     assert "Delta 对冲" in svg
+    assert (
+        f'<rect x="0" y="0" width="{layout["width"]}" height="{layout["height"]}"'
+        in svg
+        and 'rx="16" fill="none" stroke="#4a3318" stroke-width="1.5"'
+        in svg
+    )
+    assert 'stroke-dasharray' not in svg.split('<rect x="0" y="0"', 1)[1].split("/>", 1)[0]
+    assert 'x="884" y="' in svg
+    assert f'y="{int(layout["height"]) - 16}"' in svg
+    assert "chendot · prism" in svg
     assert 'class="parallel-lanes"' in svg
     assert 'stroke="#9b7a40" stroke-width="1.5" stroke-dasharray="7 9" opacity="0.6"' in svg
     assert 'font-size="12" font-weight="650" letter-spacing="1"' in svg
     assert 'stroke-dasharray="8 7"' in svg
+    assert '<rect x="' in svg
+    assert 'fill="#1c1612" /><text' in svg
     assert "L 40.0" in feedback_path or "L 860.0" in feedback_path
     assert "L 450.0" not in feedback_path
 
@@ -567,3 +583,74 @@ def test_parallel_lanes_render_guides_and_margin_feedback_route() -> None:
     ]
     assert points[0][0] not in {40.0, 860.0}
     assert points[-1][0] not in {40.0, 860.0}
+    assert not renderer._drop_parallel_edge_path(
+        feedback_edge,
+        renderer._parallel_path_endpoints(feedback_path),
+        positions,
+        layout,
+    )
+
+
+def test_parallel_lanes_vertical_edge_label_uses_gap_midpoint() -> None:
+    prism = PrismDoc.from_yaml("examples/stablecoin-interest-parallel-lanes.yaml")
+    theme = load_theme("warm_layered")
+    renderer = MermaidRenderer()
+    layout = renderer._layout_parallel_lanes(prism)
+    positions = layout["positions"]
+    edge = next(edge for edge in prism.edges if edge.from_ == "cash_reserve")
+    source = positions[edge.from_]
+    target = positions[edge.to]
+    expected_y = (source[1] + source[3] + target[1]) / 2
+
+    label = renderer._parallel_edge_label(edge, positions, theme, "vertical")
+
+    assert f'y="{expected_y:.1f}"' in label
+    assert 'fill="#1c1612"' in label
+
+
+def test_parallel_lanes_skips_invalid_edges_with_warning(caplog) -> None:
+    prism = PrismDoc.from_yaml("examples/stablecoin-interest-parallel-lanes.yaml")
+    theme = load_theme("warm_layered")
+    renderer = MermaidRenderer()
+    layout = renderer._layout_parallel_lanes(prism)
+    positions = layout["positions"]
+    invalid_edge = Edge.model_validate(
+        {
+            "from": "missing_source",
+            "to": "cash_reserve",
+            "label": "bad",
+            "type": "feedback",
+            "direction": "forward",
+        }
+    )
+
+    caplog.set_level("WARNING", logger="prism.render.mermaid")
+    svg = renderer._render_parallel_lanes_edges(
+        PrismDoc.model_validate(
+            {
+                **prism.model_dump(mode="json", by_alias=True),
+                "edges": [invalid_edge.model_dump(mode="json", by_alias=True)],
+            }
+        ),
+        positions,
+        layout,
+        theme,
+    )
+
+    assert svg == ""
+    assert "invalid node reference" in caplog.text
+
+
+def test_parallel_lanes_drops_zero_length_and_stray_left_paths(caplog) -> None:
+    prism = PrismDoc.from_yaml("examples/stablecoin-interest-parallel-lanes.yaml")
+    renderer = MermaidRenderer()
+    layout = renderer._layout_parallel_lanes(prism)
+    positions = layout["positions"]
+    edge = prism.edges[0]
+
+    caplog.set_level("WARNING", logger="prism.render.mermaid")
+
+    assert renderer._drop_parallel_edge_path(edge, ((39.0, 120.0), (90.0, 120.0)), positions, layout)
+    assert renderer._drop_parallel_edge_path(edge, ((80.0, 120.0), (80.0, 120.0)), positions, layout)
+    assert "stray left-margin" in caplog.text
+    assert "zero-length" in caplog.text

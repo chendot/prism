@@ -251,3 +251,14 @@ watermark_color: "#302618"
 Renderer 从 `meta.visual_theme` 读取主题名称，加载对应 YAML，不硬编码任何 hex 值。
 
 `parallel_lanes` 的泳道标题文字沿用本主题的 `text_secondary`；泳道分隔线使用 `accent_secondary`、60% opacity、1.5px stroke-width；跨泳道虚线（entry fan-out / bottom convergence / long feedback）使用 `accent_secondary`，不新增主题色值。
+
+## Visual Grammar（视觉语法）
+
+节点 role、edge type、status 到具体视觉样式（形状/描边/颜色/缩放）的映射规则定义在 `VISUAL_GRAMMAR.md`。
+
+核心约束：
+- `role` 只决定 shape / border / radius / scale，不决定颜色
+- `status` 只决定颜色，与 `role` 正交
+- Renderer 不得硬编码任何一条映射规则，必须从 ontology 的视觉字段读取
+
+`VISUAL_GRAMMAR.md` 达成共识后视为定版，后续修改需人工确认（约束级别与 Visual Theme 一致）。
