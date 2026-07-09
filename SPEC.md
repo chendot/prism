@@ -43,11 +43,20 @@ render: {}
 - `nodes[].id` 必须是唯一的 lowercase snake_case。
 - `nodes[].role` 只在 schema 中声明为字符串，合法值由 ontology 校验。
 - `nodes[].weight` 只在 schema 中声明为字符串，合法值由 ontology 的 `weights` 块校验，默认 `secondary`。
+- `nodes[].lane` 可选字段，字符串。仅在 `render.template == "parallel_lanes"` 时生效，用于将节点分配到某条并行泳道；其他 template 忽略该字段。合法值由 `render.lanes[].id` 校验（见下方 render 字段约束）。
 - `edges[].type` 只在 schema 中声明为字符串，合法值由 ontology 校验。
 - `edges[].from` 和 `edges[].to` 必须引用已有 node id。
 - `loops[]` 用于保留反馈循环，即使某些 renderer 不能原生表达。
+- `render.lanes` 可选字段，仅 `parallel_lanes` template 使用，结构为 `[{id, title, order}]`，定义泳道的数量、标题和排列顺序。其他 template 忽略该字段。
 
 结构定义在 `src/prism/core/schema.py`，跨字段和 ontology 校验在 `src/prism/core/validator.py`。
+
+**parallel_lanes 专属校验规则**（在 `core/validator.py` 中，仅当 `render.template == "parallel_lanes"` 时触发）：
+
+- 每个 node 必须有非空 `lane` 值。
+- 每个 node 的 `lane` 值必须出现在 `render.lanes[].id` 中；否则校验失败。
+- `render.lanes` 至少包含 2 个泳道。
+- 该规则不影响其他 template 的校验路径，属于 additive 检查。
 
 ## Ontology
 
@@ -120,7 +129,7 @@ meta:
 
 路径：`src/prism/templates/<name>.yaml`
 
-当前三个模板（Phase B 前不扩展）：
+当前四个模板（Phase B 前不再扩展）：
 
 ### value_flow
 
@@ -151,6 +160,19 @@ meta:
 - 边以 `depends_on` / `abstracts` / `enables` 为主
 - 同层节点不应有直接边（层内关系通过 ontology 的 `group` 字段描述）
 - 推荐节点数：6–12
+
+### parallel_lanes
+
+适用主题：多条并行价值路径的对比结构——同一入口分流出多种机制，各自独立产生收益并流向不同归属方（例如：稳定币多种生息模式对比、多种融资渠道对比、多路径风险敞口对比）。当主题的核心叙事是"几种做法/几条路径的横向对比"而非单一链条或网络时，优先选择此模板而非 `value_flow`。
+
+结构约束：
+- 每个节点必须有 `lane` 属性，标明所属并行路径
+- 必须有一个共享的入口节点（`entry` 角色），其出边分别指向各条泳道的第一个节点
+- 每条泳道内部的边应构成一条独立的纵向链条，泳道内节点数建议 3–5
+- 允许存在跨泳道边，但仅限两类：入口分流（entry fan-out）与终点汇聚（多条泳道流向同一个下游节点，如"系统性风险"）；不允许在泳道中段随意添加跨泳道边
+- 泳道数量建议 2–4 条；超过 4 条应考虑拆分为多图或改用 `value_flow`
+- 推荐节点总数：10–18（含入口和汇聚节点）
+- `render.lanes` 必须与实际使用的 `lane` 值一一对应，顺序决定视觉排列顺序（左到右）
 
 ---
 
@@ -201,6 +223,8 @@ Page 3（implication）：loops + 结论文字
 输出尺寸：900×383 px
 ```
 
+**parallel_lanes 与 target_format 的关系**：`x_card`（最多 6 节点）与 `parallel_lanes`（推荐 10–18 节点）在密度上冲突，Renderer 遇到该组合时应回退为按 weight 筛选后合并为单列展示，不强行保留泳道结构。`xiaohongshu_card` 和 `xiaohongshu_carousel` 的 Page 2 是 `parallel_lanes` 的主要使用场景。
+
 ---
 
 ## Visual Theme（视觉主题）
@@ -225,3 +249,5 @@ watermark_color: "#302618"
 ```
 
 Renderer 从 `meta.visual_theme` 读取主题名称，加载对应 YAML，不硬编码任何 hex 值。
+
+`parallel_lanes` 的泳道标题文字沿用本主题的 `text_secondary`；泳道分隔线使用 `accent_secondary`、60% opacity、1.5px stroke-width；跨泳道虚线（entry fan-out / bottom convergence / long feedback）使用 `accent_secondary`，不新增主题色值。

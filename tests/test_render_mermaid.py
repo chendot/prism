@@ -525,6 +525,19 @@ def test_parallel_lanes_layout_stacks_nodes_by_lane() -> None:
     assert positions["hedge_collateral"][0] == positions["short_perps"][0]
     assert positions["stablecoin_users"][1] < positions["cash_reserve"][1]
     assert positions["interest_allocation"][1] > positions["issuer_capture"][1]
+    convergence_x, _y, convergence_width, _height = positions["interest_allocation"]
+    assert convergence_x + convergence_width / 2 == layout["width"] / 2
+
+
+def test_parallel_lanes_height_follows_content_bottom() -> None:
+    prism = PrismDoc.from_yaml("examples/stablecoin-interest-parallel-lanes.yaml")
+    renderer = MermaidRenderer()
+    layout = renderer._layout_parallel_lanes(prism)
+    positions = layout["positions"]
+    content_bottom = max(y + height for _x, y, _width, height in positions.values())
+
+    assert layout["height"] == int(content_bottom + 60)
+    assert layout["height"] < 1200
 
 
 def test_parallel_lanes_render_guides_and_margin_feedback_route() -> None:
@@ -542,6 +555,15 @@ def test_parallel_lanes_render_guides_and_margin_feedback_route() -> None:
     assert "抵押借贷" in svg
     assert "Delta 对冲" in svg
     assert 'class="parallel-lanes"' in svg
+    assert 'stroke="#9b7a40" stroke-width="1.5" stroke-dasharray="7 9" opacity="0.6"' in svg
+    assert 'font-size="12" font-weight="650" letter-spacing="1"' in svg
     assert 'stroke-dasharray="8 7"' in svg
     assert "L 40.0" in feedback_path or "L 860.0" in feedback_path
     assert "L 450.0" not in feedback_path
+
+    points = [
+        (float(x), float(y))
+        for x, y in re.findall(r"[ML] ([0-9.]+) ([0-9.]+)", feedback_path)
+    ]
+    assert points[0][0] not in {40.0, 860.0}
+    assert points[-1][0] not in {40.0, 860.0}

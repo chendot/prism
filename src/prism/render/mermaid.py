@@ -190,7 +190,8 @@ class MermaidRenderer(Renderer):
             center_x = margin_x + index * lane_width + lane_width / 2
             parts.append(
                 f'<text x="{center_x:.1f}" y="{header_y:.1f}" text-anchor="middle" '
-                f'fill="{theme.text_secondary}" font-size="14" font-weight="650" '
+                f'fill="{theme.text_secondary}" font-size="12" font-weight="650" '
+                f'letter-spacing="1" '
                 f'font-family="ui-sans-serif, system-ui">{escape(lane.title)}</text>'
             )
             if index > 0:
@@ -198,8 +199,8 @@ class MermaidRenderer(Renderer):
                 parts.append(
                     f'<path d="M {divider_x:.1f} {divider_top:.1f} '
                     f'L {divider_x:.1f} {divider_bottom:.1f}" fill="none" '
-                    f'stroke="{theme.text_secondary}" stroke-width="1" '
-                    f'stroke-dasharray="7 9" opacity="0.34" />'
+                    f'stroke="{theme.accent_secondary}" stroke-width="1.5" '
+                    f'stroke-dasharray="7 9" opacity="0.6" />'
                 )
         return f'<g class="parallel-lanes">{"".join(parts)}</g>'
 
@@ -303,12 +304,12 @@ class MermaidRenderer(Renderer):
     ) -> str:
         width = int(layout["width"])
         height = int(layout["height"])
-        x1, y1, w1, h1 = positions[edge.from_]
-        x2, y2, w2, h2 = positions[edge.to]
-        source_center = (x1 + w1 / 2, y1 + h1 / 2)
-        target_center = (x2 + w2 / 2, y2 + h2 / 2)
         left_gutter = 40
         right_gutter = width - 40
+        source_box = positions[edge.from_]
+        target_box = positions[edge.to]
+        source_center = (source_box[0] + source_box[2] / 2, source_box[1] + source_box[3] / 2)
+        target_center = (target_box[0] + target_box[2] / 2, target_box[1] + target_box[3] / 2)
         source_gutter_x = (
             left_gutter
             if abs(source_center[0] - left_gutter) <= abs(source_center[0] - right_gutter)
@@ -319,24 +320,29 @@ class MermaidRenderer(Renderer):
             if abs(target_center[0] - left_gutter) <= abs(target_center[0] - right_gutter)
             else right_gutter
         )
-        source_side_x = x1 if source_gutter_x == left_gutter else x1 + w1
-        target_side_x = x2 if target_gutter_x == left_gutter else x2 + w2
-        source_y = source_center[1]
-        target_y = target_center[1]
-        route_y = max(box[1] + box[3] for box in positions.values()) + 34
-        if route_y > height - 88:
-            route_y = min(y1, y2) - 30
-        route_y = self._clamp(route_y, 54, height - 70)
+        source_anchor = self._parallel_safe_border_anchor(source_box, source_gutter_x)
+        target_anchor = self._parallel_safe_border_anchor(target_box, target_gutter_x)
+        route_y = height - 30
         return self._polyline_path(
             [
-                (source_side_x, source_y),
-                (source_gutter_x, source_y),
+                source_anchor,
+                (source_gutter_x, source_anchor[1]),
                 (source_gutter_x, route_y),
                 (target_gutter_x, route_y),
-                (target_gutter_x, target_y),
-                (target_side_x, target_y),
+                (target_gutter_x, target_anchor[1]),
+                target_anchor,
             ]
         )
+
+    def _parallel_safe_border_anchor(
+        self,
+        box: tuple[float, float, float, float],
+        gutter_x: float,
+    ) -> tuple[float, float]:
+        x, y, width, height = box
+        center_x = x + width / 2
+        anchor_x = x if gutter_x <= center_x else x + width
+        return anchor_x, y + height / 2
 
     def _parallel_edge_label(
         self,
@@ -409,14 +415,13 @@ class MermaidRenderer(Renderer):
 
     def _layout_parallel_lanes(self, prism: PrismDoc) -> dict[str, object]:
         width = 900
-        base_height = 1200
         margin_x = 64
         top = 156
         node_height = 66
         node_gap = 34
         entry_gap = 46
         convergence_gap = 46
-        bottom_padding = 96
+        bottom_margin = 60
         lanes = sorted(prism.render.lanes, key=lambda lane: (lane.order, lane.id))
         lane_count = max(1, len(lanes))
         lane_width = (width - 2 * margin_x) / lane_count
@@ -457,7 +462,7 @@ class MermaidRenderer(Renderer):
         if shared_convergence:
             convergence_width = min(320, max(230, node_width))
             positions[shared_convergence] = (
-                (width - convergence_width) / 2,
+                width / 2 - convergence_width / 2,
                 lane_bottom + convergence_gap,
                 convergence_width,
                 node_height,
@@ -465,7 +470,7 @@ class MermaidRenderer(Renderer):
             order.append(shared_convergence)
 
         content_bottom = max((y + h for _x, y, _w, h in positions.values()), default=lane_top)
-        height = max(base_height, int(content_bottom + bottom_padding))
+        height = int(content_bottom + bottom_margin)
         lane_guides = {
             "lanes": lanes,
             "margin_x": margin_x,
