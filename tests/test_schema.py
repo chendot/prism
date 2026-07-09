@@ -71,3 +71,15 @@ def test_schema_defaults_node_weight_to_secondary_without_enum_validation() -> N
 
     assert prism.nodes[0].weight == "secondary"
     assert prism.nodes[1].weight == "custom"
+
+
+def test_schema_accepts_parallel_lane_fields() -> None:
+    prism = PrismDoc.from_yaml("examples/stablecoin-interest-parallel-lanes.yaml")
+
+    assert prism.render.template == "parallel_lanes"
+    assert prism.nodes[0].lane == "collateral_lending"
+    assert [lane.id for lane in prism.render.lanes] == [
+        "fiat_reserve",
+        "collateral_lending",
+        "delta_hedge",
+    ]

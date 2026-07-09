@@ -8,7 +8,7 @@ from itertools import count
 from math import ceil
 
 from prism.core.models import Ontology
-from prism.core.schema import Edge, EdgeDirection, Node, PrismDoc
+from prism.core.schema import Edge, EdgeDirection, Node, PrismDoc, RenderLane
 from prism.core.validator import validate_prism_doc
 from prism.render.base import Renderer
 from prism.render.theme import VisualTheme, load_theme
@@ -74,14 +74,27 @@ class MermaidRenderer(Renderer):
         """Render a mobile-friendly layered SVG diagram."""
 
         theme = theme or load_theme(prism.meta.visual_theme)
-        layout = self._layout_nodes(prism, ontology)
+        layout = (
+            self._layout_parallel_lanes(prism)
+            if prism.render.template == "parallel_lanes"
+            else self._layout_nodes(prism, ontology)
+        )
         width = layout["width"]
         height = layout["height"]
         positions: dict[str, tuple[float, float, float, float]] = layout["positions"]  # type: ignore[assignment]
         node_by_id = {node.id: node for node in prism.nodes}
         emphasized_nodes = self._emphasized_nodes(prism)
-        edge_svg = self._render_svg_edges(prism, positions, theme)
+        edge_svg = (
+            self._render_parallel_lanes_edges(prism, positions, layout, theme)
+            if prism.render.template == "parallel_lanes"
+            else self._render_svg_edges(prism, positions, theme)
+        )
         loops_svg = self._render_svg_loops(prism, theme) if prism.render.show_loops else ""
+        lane_svg = (
+            self._render_parallel_lane_guides(layout, theme)
+            if prism.render.template == "parallel_lanes"
+            else ""
+        )
         node_svg = "".join(
             self._render_svg_node(
                 node_by_id[node_id],
@@ -107,6 +120,7 @@ class MermaidRenderer(Renderer):
   </defs>
   <rect width="{width}" height="{height}" fill="{theme.background}" />
   <rect x="24" y="24" width="{width - 48}" height="{height - 48}" rx="16" fill="{theme.surface}" stroke="{theme.surface_border}" stroke-width="1" opacity="0.42" />
+  {lane_svg}
   <g class="edges">{edge_svg}</g>
   <g class="nodes">{node_svg}</g>
   {loops_svg}
@@ -161,6 +175,187 @@ class MermaidRenderer(Renderer):
             return theme.accent_secondary
         return theme.accent_primary
 
+    def _render_parallel_lane_guides(
+        self, layout: dict[str, object], theme: VisualTheme
+    ) -> str:
+        guides: dict[str, object] = layout["lane_guides"]  # type: ignore[assignment]
+        lanes: list[RenderLane] = guides["lanes"]  # type: ignore[assignment]
+        margin_x = float(guides["margin_x"])
+        lane_width = float(guides["lane_width"])
+        header_y = float(guides["header_y"])
+        divider_top = float(guides["divider_top"])
+        divider_bottom = float(guides["divider_bottom"])
+        parts: list[str] = []
+        for index, lane in enumerate(lanes):
+            center_x = margin_x + index * lane_width + lane_width / 2
+            parts.append(
+                f'<text x="{center_x:.1f}" y="{header_y:.1f}" text-anchor="middle" '
+                f'fill="{theme.text_secondary}" font-size="14" font-weight="650" '
+                f'font-family="ui-sans-serif, system-ui">{escape(lane.title)}</text>'
+            )
+            if index > 0:
+                divider_x = margin_x + index * lane_width
+                parts.append(
+                    f'<path d="M {divider_x:.1f} {divider_top:.1f} '
+                    f'L {divider_x:.1f} {divider_bottom:.1f}" fill="none" '
+                    f'stroke="{theme.text_secondary}" stroke-width="1" '
+                    f'stroke-dasharray="7 9" opacity="0.34" />'
+                )
+        return f'<g class="parallel-lanes">{"".join(parts)}</g>'
+
+    def _render_parallel_lanes_edges(
+        self,
+        prism: PrismDoc,
+        positions: dict[str, tuple[float, float, float, float]],
+        layout: dict[str, object],
+        theme: VisualTheme,
+    ) -> str:
+        lane_by_node = {node.id: node.lane for node in prism.nodes}
+        shared_entry = layout.get("shared_entry")
+        shared_convergence = layout.get("shared_convergence")
+        parts: list[str] = []
+        for edge in prism.edges:
+            if edge.from_ not in positions or edge.to not in positions:
+                continue
+            same_lane = lane_by_node.get(edge.from_) == lane_by_node.get(edge.to)
+            if same_lane:
+                path, dash = self._parallel_lane_edge_path(edge, positions), ""
+                color = self._edge_color(edge.type, theme)
+            elif edge.from_ == shared_entry:
+                path, dash = self._parallel_entry_fan_path(edge, positions), ""
+                color = theme.accent_secondary
+            elif edge.to == shared_convergence:
+                path, dash = self._parallel_convergence_fan_path(edge, positions), ""
+                color = theme.accent_secondary
+            else:
+                path = self._parallel_margin_edge_path(edge, positions, layout)
+                dash = ' stroke-dasharray="8 7"'
+                color = theme.accent_secondary
+
+            marker = {
+                theme.accent_secondary: "arrow-secondary",
+                theme.accent_danger: "arrow-danger",
+            }.get(color, "arrow-primary")
+            label = self._parallel_edge_label(edge, positions, theme)
+            parts.append(
+                f'<path d="{path}" fill="none" stroke="{color}" stroke-width="1.5"{dash} '
+                f'marker-end="url(#{marker})" opacity="0.86" />{label}'
+            )
+        return "".join(parts)
+
+    def _parallel_lane_edge_path(
+        self,
+        edge: Edge,
+        positions: dict[str, tuple[float, float, float, float]],
+    ) -> str:
+        x1, y1, w1, h1 = positions[edge.from_]
+        x2, y2, w2, h2 = positions[edge.to]
+        if y2 >= y1:
+            start = (x1 + w1 / 2, y1 + h1)
+            end = (x2 + w2 / 2, y2)
+        else:
+            start = (x1 + w1 / 2, y1)
+            end = (x2 + w2 / 2, y2 + h2)
+        mid_y = (start[1] + end[1]) / 2
+        return self._polyline_path([start, (start[0], mid_y), (end[0], mid_y), end])
+
+    def _parallel_entry_fan_path(
+        self,
+        edge: Edge,
+        positions: dict[str, tuple[float, float, float, float]],
+    ) -> str:
+        x1, y1, w1, h1 = positions[edge.from_]
+        x2, y2, w2, _h2 = positions[edge.to]
+        start_x = x1 + w1 / 2
+        start_y = y1 + h1
+        end_x = x2 + w2 / 2
+        end_y = y2
+        control_y = start_y + min(64, max(28, (end_y - start_y) * 0.45))
+        return (
+            f"M {start_x:.1f} {start_y:.1f} "
+            f"C {start_x:.1f} {control_y:.1f}, {end_x:.1f} {control_y:.1f}, "
+            f"{end_x:.1f} {end_y:.1f}"
+        )
+
+    def _parallel_convergence_fan_path(
+        self,
+        edge: Edge,
+        positions: dict[str, tuple[float, float, float, float]],
+    ) -> str:
+        x1, y1, w1, h1 = positions[edge.from_]
+        x2, y2, w2, _h2 = positions[edge.to]
+        start_x = x1 + w1 / 2
+        start_y = y1 + h1
+        end_x = x2 + w2 / 2
+        end_y = y2
+        control_y = end_y - min(64, max(28, (end_y - start_y) * 0.45))
+        return (
+            f"M {start_x:.1f} {start_y:.1f} "
+            f"C {start_x:.1f} {control_y:.1f}, {end_x:.1f} {control_y:.1f}, "
+            f"{end_x:.1f} {end_y:.1f}"
+        )
+
+    def _parallel_margin_edge_path(
+        self,
+        edge: Edge,
+        positions: dict[str, tuple[float, float, float, float]],
+        layout: dict[str, object],
+    ) -> str:
+        width = int(layout["width"])
+        height = int(layout["height"])
+        x1, y1, w1, h1 = positions[edge.from_]
+        x2, y2, w2, h2 = positions[edge.to]
+        source_center = (x1 + w1 / 2, y1 + h1 / 2)
+        target_center = (x2 + w2 / 2, y2 + h2 / 2)
+        left_gutter = 40
+        right_gutter = width - 40
+        source_gutter_x = (
+            left_gutter
+            if abs(source_center[0] - left_gutter) <= abs(source_center[0] - right_gutter)
+            else right_gutter
+        )
+        target_gutter_x = (
+            left_gutter
+            if abs(target_center[0] - left_gutter) <= abs(target_center[0] - right_gutter)
+            else right_gutter
+        )
+        source_side_x = x1 if source_gutter_x == left_gutter else x1 + w1
+        target_side_x = x2 if target_gutter_x == left_gutter else x2 + w2
+        source_y = source_center[1]
+        target_y = target_center[1]
+        route_y = max(box[1] + box[3] for box in positions.values()) + 34
+        if route_y > height - 88:
+            route_y = min(y1, y2) - 30
+        route_y = self._clamp(route_y, 54, height - 70)
+        return self._polyline_path(
+            [
+                (source_side_x, source_y),
+                (source_gutter_x, source_y),
+                (source_gutter_x, route_y),
+                (target_gutter_x, route_y),
+                (target_gutter_x, target_y),
+                (target_side_x, target_y),
+            ]
+        )
+
+    def _parallel_edge_label(
+        self,
+        edge: Edge,
+        positions: dict[str, tuple[float, float, float, float]],
+        theme: VisualTheme,
+    ) -> str:
+        if not edge.label:
+            return ""
+        x1, y1, w1, h1 = positions[edge.from_]
+        x2, y2, w2, h2 = positions[edge.to]
+        label_x = self._clamp((x1 + w1 / 2 + x2 + w2 / 2) / 2, 36, 864)
+        label_y = (y1 + h1 / 2 + y2 + h2 / 2) / 2 - 8
+        return (
+            f'<text x="{label_x:.1f}" y="{label_y:.1f}" text-anchor="middle" '
+            f'fill="{theme.text_secondary}" font-size="12" '
+            f'font-family="ui-sans-serif, system-ui">{escape(edge.label)}</text>'
+        )
+
     def _layout_nodes(
         self, prism: PrismDoc, ontology: Ontology | None = None
     ) -> dict[str, object]:
@@ -211,6 +406,145 @@ class MermaidRenderer(Renderer):
             )
 
         return {"width": width, "height": height, "positions": positions, "order": order}
+
+    def _layout_parallel_lanes(self, prism: PrismDoc) -> dict[str, object]:
+        width = 900
+        base_height = 1200
+        margin_x = 64
+        top = 156
+        node_height = 66
+        node_gap = 34
+        entry_gap = 46
+        convergence_gap = 46
+        bottom_padding = 96
+        lanes = sorted(prism.render.lanes, key=lambda lane: (lane.order, lane.id))
+        lane_count = max(1, len(lanes))
+        lane_width = (width - 2 * margin_x) / lane_count
+        node_width = max(150, lane_width - 28)
+        lane_by_node = {node.id: node.lane for node in prism.nodes}
+        node_ids = [node.id for node in prism.nodes]
+
+        shared_entry = self._parallel_shared_entry(prism, lanes)
+        shared_convergence = self._parallel_shared_convergence(prism, lanes)
+        floating_nodes = {node_id for node_id in (shared_entry, shared_convergence) if node_id}
+        lane_orders: dict[str, list[str]] = {}
+        positions: dict[str, tuple[float, float, float, float]] = {}
+        order: list[str] = []
+
+        lane_top = top + (node_height + entry_gap if shared_entry else 0)
+        for lane_index, lane in enumerate(lanes):
+            lane_nodes = [
+                node_id
+                for node_id in node_ids
+                if lane_by_node[node_id] == lane.id and node_id not in floating_nodes
+            ]
+            lane_order = self._parallel_lane_topological_order(prism, lane_nodes)
+            lane_orders[lane.id] = lane_order
+            x = margin_x + lane_index * lane_width + (lane_width - node_width) / 2
+            for row_index, node_id in enumerate(lane_order):
+                y = lane_top + row_index * (node_height + node_gap)
+                positions[node_id] = (x, y, node_width, node_height)
+                order.append(node_id)
+
+        lane_bottom = max(
+            (box[1] + box[3] for node_id, box in positions.items() if node_id not in floating_nodes),
+            default=lane_top,
+        )
+        if shared_entry:
+            entry_width = min(300, max(220, node_width))
+            positions[shared_entry] = ((width - entry_width) / 2, 70, entry_width, node_height)
+            order.insert(0, shared_entry)
+        if shared_convergence:
+            convergence_width = min(320, max(230, node_width))
+            positions[shared_convergence] = (
+                (width - convergence_width) / 2,
+                lane_bottom + convergence_gap,
+                convergence_width,
+                node_height,
+            )
+            order.append(shared_convergence)
+
+        content_bottom = max((y + h for _x, y, _w, h in positions.values()), default=lane_top)
+        height = max(base_height, int(content_bottom + bottom_padding))
+        lane_guides = {
+            "lanes": lanes,
+            "margin_x": margin_x,
+            "lane_width": lane_width,
+            "header_y": max(42, lane_top - 34),
+            "divider_top": max(104, lane_top - 58),
+            "divider_bottom": max(content_bottom + 24, lane_top + 420),
+        }
+
+        return {
+            "width": width,
+            "height": height,
+            "positions": positions,
+            "order": order,
+            "lane_orders": lane_orders,
+            "shared_entry": shared_entry,
+            "shared_convergence": shared_convergence,
+            "lane_guides": lane_guides,
+        }
+
+    def _parallel_lane_topological_order(self, prism: PrismDoc, lane_nodes: list[str]) -> list[str]:
+        lane_node_set = set(lane_nodes)
+        outgoing = {node_id: [] for node_id in lane_nodes}
+        indegree = {node_id: 0 for node_id in lane_nodes}
+        for edge in prism.edges:
+            if edge.from_ not in lane_node_set or edge.to not in lane_node_set:
+                continue
+            if edge.type == "feedback" or edge.direction == EdgeDirection.BACKWARD:
+                continue
+            outgoing[edge.from_].append(edge.to)
+            indegree[edge.to] += 1
+
+        ready = [node_id for node_id in lane_nodes if indegree[node_id] == 0]
+        ordered: list[str] = []
+        while ready:
+            node_id = ready.pop(0)
+            ordered.append(node_id)
+            for target in outgoing[node_id]:
+                indegree[target] -= 1
+                if indegree[target] == 0:
+                    ready.append(target)
+
+        ordered_set = set(ordered)
+        ordered.extend(node_id for node_id in lane_nodes if node_id not in ordered_set)
+        return ordered
+
+    def _parallel_shared_entry(
+        self,
+        prism: PrismDoc,
+        lanes: list[RenderLane],
+    ) -> str | None:
+        lane_ids = {lane.id for lane in lanes}
+        lane_by_node = {node.id: node.lane for node in prism.nodes}
+        for node in prism.nodes:
+            target_lanes = {
+                lane_by_node.get(edge.to)
+                for edge in prism.edges
+                if edge.from_ == node.id and edge.to != node.id
+            }
+            if target_lanes & lane_ids == lane_ids:
+                return node.id
+        return None
+
+    def _parallel_shared_convergence(
+        self,
+        prism: PrismDoc,
+        lanes: list[RenderLane],
+    ) -> str | None:
+        lane_ids = {lane.id for lane in lanes}
+        lane_by_node = {node.id: node.lane for node in prism.nodes}
+        for node in prism.nodes:
+            source_lanes = {
+                lane_by_node.get(edge.from_)
+                for edge in prism.edges
+                if edge.to == node.id and lane_by_node.get(edge.from_) != node.lane
+            }
+            if len(source_lanes & lane_ids) >= 2:
+                return node.id
+        return None
 
     def _ensure_min_horizontal_gap(
         self,

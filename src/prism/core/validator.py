@@ -76,7 +76,43 @@ def validate_prism_doc(prism: PrismDoc, ontology: Ontology | None = None) -> Pri
             f"highlight_nodes references unknown node(s): {', '.join(missing_highlights)}"
         )
 
+    if prism.render.template == "parallel_lanes":
+        _validate_parallel_lanes(prism)
+
     return prism
+
+
+def _validate_parallel_lanes(prism: PrismDoc) -> None:
+    lanes = prism.render.lanes
+    if len(lanes) < 2:
+        raise PrismValidationError("parallel_lanes requires at least 2 render.lanes entries")
+
+    lane_ids = [lane.id for lane in lanes]
+    duplicate_lane_ids = sorted(
+        {lane_id for lane_id in lane_ids if lane_ids.count(lane_id) > 1}
+    )
+    if duplicate_lane_ids:
+        raise PrismValidationError(f"Duplicate render.lanes id(s): {', '.join(duplicate_lane_ids)}")
+
+    lane_id_set = set(lane_ids)
+    missing_lane_nodes = sorted(node.id for node in prism.nodes if not node.lane)
+    if missing_lane_nodes:
+        raise PrismValidationError(
+            "parallel_lanes nodes must define lane: " + ", ".join(missing_lane_nodes)
+        )
+
+    invalid_lane_nodes = sorted(
+        f"{node.id}:{node.lane}"
+        for node in prism.nodes
+        if node.lane is not None and node.lane not in lane_id_set
+    )
+    if invalid_lane_nodes:
+        available = ", ".join(sorted(lane_id_set))
+        raise PrismValidationError(
+            "parallel_lanes node lane must match render.lanes id. "
+            f"Invalid node lane(s): {', '.join(invalid_lane_nodes)}. "
+            f"Available lanes: {available}"
+        )
 
 
 def validate_prism_file(path: str | Path) -> PrismDoc:

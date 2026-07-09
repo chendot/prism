@@ -509,3 +509,39 @@ def test_feedback_loops_truncate_when_too_many_items() -> None:
     assert loop_text_y_values
     assert max(loop_text_y_values) <= 1144
     assert "..." in svg
+
+
+def test_parallel_lanes_layout_stacks_nodes_by_lane() -> None:
+    prism = PrismDoc.from_yaml("examples/stablecoin-interest-parallel-lanes.yaml")
+    renderer = MermaidRenderer()
+    layout = renderer._layout_parallel_lanes(prism)
+    positions = layout["positions"]
+
+    assert layout["shared_entry"] == "stablecoin_users"
+    assert layout["shared_convergence"] == "interest_allocation"
+    assert positions["cash_reserve"][0] < positions["lending_pool"][0] < positions["hedge_collateral"][0]
+    assert positions["cash_reserve"][0] == positions["treasury_bills"][0]
+    assert positions["lending_pool"][0] == positions["borrowers"][0]
+    assert positions["hedge_collateral"][0] == positions["short_perps"][0]
+    assert positions["stablecoin_users"][1] < positions["cash_reserve"][1]
+    assert positions["interest_allocation"][1] > positions["issuer_capture"][1]
+
+
+def test_parallel_lanes_render_guides_and_margin_feedback_route() -> None:
+    prism = PrismDoc.from_yaml("examples/stablecoin-interest-parallel-lanes.yaml")
+    ontology = load_ontology("financial")
+    renderer = MermaidRenderer()
+    layout = renderer._layout_parallel_lanes(prism)
+    positions = layout["positions"]
+    feedback_edge = next(edge for edge in prism.edges if edge.from_ == "funding_income")
+
+    svg = renderer.to_svg(prism, ontology)
+    feedback_path = renderer._parallel_margin_edge_path(feedback_edge, positions, layout)
+
+    assert "法币储备" in svg
+    assert "抵押借贷" in svg
+    assert "Delta 对冲" in svg
+    assert 'class="parallel-lanes"' in svg
+    assert 'stroke-dasharray="8 7"' in svg
+    assert "L 40.0" in feedback_path or "L 860.0" in feedback_path
+    assert "L 450.0" not in feedback_path

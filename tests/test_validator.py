@@ -39,3 +39,34 @@ def test_validator_rejects_unknown_edge_node() -> None:
 
     with pytest.raises(PrismValidationError, match="unknown to node"):
         validate_prism_doc(invalid)
+
+
+def test_validator_accepts_parallel_lanes_example() -> None:
+    prism = validate_prism_file("examples/stablecoin-interest-parallel-lanes.yaml")
+
+    assert prism.render.template == "parallel_lanes"
+
+
+def test_validator_requires_node_lanes_only_for_parallel_lanes() -> None:
+    prism = PrismDoc.from_yaml("examples/stablecoin-interest-parallel-lanes.yaml")
+    data = prism.model_dump(mode="json", by_alias=True)
+    data["nodes"][0].pop("lane")
+    invalid_parallel = PrismDoc.model_validate(data)
+
+    with pytest.raises(PrismValidationError, match="must define lane"):
+        validate_prism_doc(invalid_parallel)
+
+    data["render"]["template"] = "value_flow"
+    non_parallel = PrismDoc.model_validate(data)
+
+    validate_prism_doc(non_parallel)
+
+
+def test_validator_rejects_unknown_parallel_lane() -> None:
+    prism = PrismDoc.from_yaml("examples/stablecoin-interest-parallel-lanes.yaml")
+    data = prism.model_dump(mode="json", by_alias=True)
+    data["nodes"][0]["lane"] = "missing_lane"
+    invalid = PrismDoc.model_validate(data)
+
+    with pytest.raises(PrismValidationError, match="must match render.lanes id"):
+        validate_prism_doc(invalid)

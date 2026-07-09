@@ -1,0 +1,208 @@
+meta:
+  title: 稳定币利息分配的三条路径
+  subtitle: 法币储备、抵押借贷与 Delta 对冲的收益归属对比
+  topic: 稳定币利息分配
+  ontology: financial
+  template: parallel_lanes
+  visual_theme: warm_layered
+  target_format: xiaohongshu_card
+  audience: intermediate
+  language: zh
+  tags:
+    - stablecoin
+    - interest
+    - defi
+
+diagram:
+  type: comparison
+  direction: TD
+
+nodes:
+  - id: stablecoin_users
+    label: 稳定币用户
+    sublabel: 提供美元流动性，获得链上美元
+    role: buyer
+    lane: collateral_lending
+    weight: primary
+  - id: cash_reserve
+    label: 法币储备
+    sublabel: 存款和短债作为发行底层资产
+    role: asset
+    lane: fiat_reserve
+    weight: secondary
+  - id: treasury_bills
+    label: 短期国债
+    sublabel: 储备组合主要产生无风险利息
+    role: asset
+    lane: fiat_reserve
+    weight: secondary
+  - id: reserve_yield
+    label: 储备收益
+    sublabel: 利息通常先进入发行方账户
+    role: asset
+    lane: fiat_reserve
+    weight: primary
+  - id: issuer_capture
+    label: 发行方留存
+    sublabel: 用户持币但收益不自动返还
+    role: issuer
+    lane: fiat_reserve
+    weight: secondary
+  - id: lending_pool
+    label: 抵押借贷池
+    sublabel: 用户把稳定币投入链上资金池
+    role: market
+    lane: collateral_lending
+    weight: secondary
+  - id: borrowers
+    label: 借款人
+    sublabel: 抵押资产后支付稳定币借款利率
+    role: buyer
+    lane: collateral_lending
+    weight: secondary
+  - id: lending_interest
+    label: 借贷利息
+    sublabel: 收益来自链上杠杆需求
+    role: asset
+    lane: collateral_lending
+    weight: primary
+  - id: depositor_share
+    label: 存入者分成
+    sublabel: 利息按协议规则回流给资金提供者
+    role: buyer
+    lane: collateral_lending
+    weight: secondary
+  - id: hedge_collateral
+    label: 对冲抵押品
+    sublabel: 现货或抵押资产支撑合成美元
+    role: asset
+    lane: delta_hedge
+    weight: secondary
+  - id: short_perps
+    label: 永续空头
+    sublabel: 用衍生品抵消币价波动
+    role: market
+    lane: delta_hedge
+    weight: secondary
+  - id: funding_income
+    label: 资金费收益
+    sublabel: 多头支付资金费时形成收益
+    role: asset
+    lane: delta_hedge
+    weight: primary
+  - id: hedge_operator
+    label: 对冲运营方
+    sublabel: 承担交易、流动性和风控成本
+    role: intermediary
+    lane: delta_hedge
+    weight: secondary
+  - id: interest_allocation
+    label: 利息分配权
+    sublabel: 核心问题是谁拿走稳定币背后的收益
+    role: risk
+    lane: collateral_lending
+    weight: primary
+
+edges:
+  - from: stablecoin_users
+    to: cash_reserve
+    label: 购买发行
+    type: fund_flow
+    direction: forward
+  - from: stablecoin_users
+    to: lending_pool
+    label: 存入协议
+    type: fund_flow
+    direction: forward
+  - from: stablecoin_users
+    to: hedge_collateral
+    label: 选择合成路径
+    type: fund_flow
+    direction: forward
+  - from: cash_reserve
+    to: treasury_bills
+    label: 配置低风险资产
+    type: fund_flow
+    direction: forward
+  - from: treasury_bills
+    to: reserve_yield
+    label: 产生票息
+    type: fund_flow
+    direction: forward
+  - from: reserve_yield
+    to: issuer_capture
+    label: 留存在发行方
+    type: fund_flow
+    direction: forward
+  - from: lending_pool
+    to: borrowers
+    label: 放出资金
+    type: fund_flow
+    direction: forward
+  - from: borrowers
+    to: lending_interest
+    label: 支付利息
+    type: fund_flow
+    direction: forward
+  - from: lending_interest
+    to: depositor_share
+    label: 按份额分配
+    type: fund_flow
+    direction: forward
+  - from: hedge_collateral
+    to: short_perps
+    label: 建立对冲
+    type: fund_flow
+    direction: forward
+  - from: short_perps
+    to: funding_income
+    label: 收取资金费
+    type: fund_flow
+    direction: forward
+  - from: funding_income
+    to: hedge_operator
+    label: 覆盖运营成本
+    type: fund_flow
+    direction: forward
+  - from: issuer_capture
+    to: interest_allocation
+    label: 收益归发行方
+    type: causal
+    direction: forward
+  - from: depositor_share
+    to: interest_allocation
+    label: 收益归存入者
+    type: causal
+    direction: forward
+  - from: hedge_operator
+    to: interest_allocation
+    label: 收益归运营方
+    type: causal
+    direction: forward
+  - from: funding_income
+    to: treasury_bills
+    label: 波动改变储备偏好
+    type: feedback
+    direction: forward
+
+loops: []
+
+render:
+  template: parallel_lanes
+  style: default
+  show_loops: true
+  lanes:
+    - id: fiat_reserve
+      title: 法币储备
+      order: 1
+    - id: collateral_lending
+      title: 抵押借贷
+      order: 2
+    - id: delta_hedge
+      title: Delta 对冲
+      order: 3
+  highlight_nodes:
+    - stablecoin_users
+    - interest_allocation
+  highlight_edges: []
+  renderer: mermaid

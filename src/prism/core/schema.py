@@ -108,6 +108,7 @@ class Node(PrismBaseModel):
     sublabel: str | None = None
     role: str
     layer: int | None = None
+    lane: str | None = None
     weight: str = "secondary"
 
     @field_validator("id")
@@ -141,11 +142,21 @@ class Loop(PrismBaseModel):
     polarity: LoopPolarity
 
 
+class RenderLane(PrismBaseModel):
+    """A visual lane definition for parallel-lane render templates."""
+
+    id: str
+    title: str
+    order: int
+
+
 class RenderConfig(PrismBaseModel):
     """Renderer preferences carried by the portable document."""
 
+    template: str | None = None
     style: str = "default"
     show_loops: bool = True
+    lanes: list[RenderLane] = Field(default_factory=list)
     highlight_nodes: list[str] = Field(default_factory=list)
     highlight_edges: list[str] = Field(default_factory=list)
     renderer: RendererName = RendererName.MERMAID
