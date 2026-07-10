@@ -88,6 +88,18 @@ class Renderer(ABC):
     def render(self, prism: PrismDoc, ontology: Ontology) -> str: ...
 ```
 
+### 内置 HTML Renderer（dagre）
+
+当前内置 HTML renderer 的生产路径使用本地 vendored 的 `@dagrejs/dagre` 计算图布局：
+
+- Python 负责读取并校验 `prism.yaml`，将 PrismDoc、ontology 视觉字段、visual theme、icons 与 `LayoutConfig` 序列化进 HTML。
+- HTML 内嵌 dagre runtime 和 Prism SVG 绘制脚本，不依赖 CDN 或网络；输出文件可离线打开。
+- `LayoutConfig` 是节点尺寸、间距、边距、字号与透明度的唯一配置来源；浏览器端只消费该 payload，不维护第二份布局常量。
+- 浏览器端 dagre 负责节点与普通图层级布局；SVG 绘制继续消费 ontology 的 role/edge visual 字段和 theme 的颜色字段。
+- `parallel_lanes` 使用 dagre compound graph（`setParent`）组织泳道节点，并按 `render.lanes[].order` 固定泳道从左到右的顺序。
+- 泳道内部主流程使用正交直线；入口分流和终点汇聚使用平滑贝塞尔曲线；feedback 使用外侧虚线路由，避免参与主结构的 rank 计算。
+- 生成页面允许纵向滚动、禁止横向溢出，避免高图在视口中被裁切。
+
 新增 compressor：
 
 ```python
@@ -119,7 +131,7 @@ meta:
 
 `template` 字段由 LLMCompressor 在 Step 1 判断后写入，Compressor Step 2 读取它来约束生成结构。Renderer 不读 `template`。
 
-`target_format` 字段由 Renderer 读取，决定信息密度和 layout 策略（见下方 Platform Strategy）。
+`target_format` 是 Renderer 的平台密度策略契约（见下方 Platform Strategy）。当前 dagre renderer 先保留完整结构，尚未实现按 `target_format` 筛选节点或切换平台尺寸的分支。
 
 ---
 
@@ -235,23 +247,23 @@ Page 3（implication）：loops + 结论文字
 
 ```yaml
 name: warm_layered
-background: "#1c1612"
-surface: "#221a0e"
-surface_border: "#4a3318"
-accent_primary: "#c9a96e"    # 琥珀金 — 政策层、主流向
-accent_secondary: "#9b7a40"  # 暗金 — 中间传导层
-accent_result: "#e07b5a"     # 铜红 — 正向结果、高亮、核心判断
-accent_risk: "#e07b5a"       # 铜红 — 风险、负向节点的边框
-text_primary: "#e8d5b0"
-text_secondary: "#7a6040"
+background: "#1f1814"
+surface: "#2b211b"
+surface_border: "#6f522e"
+accent_primary: "#e5bc6a"    # 琥珀金 — 主流程与普通描边
+accent_secondary: "#c9934f"  # 暗金 — 跨泳道与次级关系
+accent_result: "#ef805d"     # 珊瑚橙 — 正向结果、高亮、核心判断
+accent_risk: "#ff8b68"       # 浅珊瑚 — 风险、负向节点的边框
+text_primary: "#f7e6c4"
+text_secondary: "#c6a878"
 node_accent_bar_width: 3     # px，节点左侧彩色竖条
 watermark: "chendot · prism"
-watermark_color: "#302618"
+watermark_color: "#6a5135"
 ```
 
 Renderer 从 `meta.visual_theme` 读取主题名称，加载对应 YAML，不硬编码任何 hex 值。
 
-`parallel_lanes` 的泳道标题文字沿用本主题的 `text_secondary`；泳道分隔线使用 `accent_secondary`、60% opacity、1.5px stroke-width；跨泳道虚线（entry fan-out / bottom convergence / long feedback）使用 `accent_secondary`，不新增主题色值。
+`parallel_lanes` 的泳道标题文字沿用本主题的 `text_secondary`；泳道框与分隔视觉使用 `accent_secondary`、60% opacity、1.5px stroke-width。入口分流与底部汇聚使用曲线表达共享入口/终点，颜色与线型仍由对应 edge type 的 ontology visual 字段决定；跨泳道 feedback 使用 `accent_secondary` 的外侧虚线，不新增主题色值。
 
 ## Visual Grammar（视觉语法）
 
