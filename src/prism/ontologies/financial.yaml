@@ -4,62 +4,174 @@ description: 金融/DeFi/宏观系统
 roles:
   issuer:
     label_zh: 发行方
-    fill: "#DBEAFE"
-    stroke: "#93C5FD"
+    visual:
+      shape: rect
+      border_width: 2.0
+      radius: 8
+      accent_bar: true
   buyer:
     label_zh: 购买方
-    fill: "#DCFCE7"
-    stroke: "#86EFAC"
+    visual:
+      shape: round
+      border_width: 1.5
+      radius: 16
+      accent_bar: false
   regulator:
     label_zh: 监管方
-    fill: "#EDE9FE"
-    stroke: "#C4B5FD"
+    visual:
+      shape: rect
+      border_width: 2.0
+      border_dash: "4,3"
+      radius: 8
+      accent_bar: false
   constraint:
     label_zh: 外部约束
-    fill: "#F5F3FF"
-    stroke: "#9B7A40"
+    visual:
+      shape: rect
+      border_width: 2.0
+      border_dash: "4,3"
+      radius: 8
+      accent_bar: false
   intermediary:
     label_zh: 中间商
-    fill: "#FEF9C3"
-    stroke: "#FDE047"
+    visual:
+      shape: double_border
+      border_width: 1.5
+      radius: 8
+      accent_bar: true
   market:
     label_zh: 市场机制
-    fill: "#F3F4F6"
-    stroke: "#D1D5DB"
+    visual:
+      shape: rect
+      border_width: 1.0
+      radius: 8
+      accent_bar: true
   risk:
     label_zh: 风险节点
-    fill: "#FEE2E2"
-    stroke: "#FCA5A5"
+    visual:
+      shape: rect
+      border_width: 2.0
+      border_dash: "4,3"
+      radius: 8
+      accent_bar: false
   asset:
     label_zh: 资产
-    fill: "#E0F2FE"
-    stroke: "#7DD3FC"
+    visual:
+      shape: rect
+      border_width: 1.0
+      radius: 8
+      accent_bar: true
+  entry:
+    label_zh: 入口
+    visual:
+      shape: round
+      border_width: 1.5
+      radius: 16
+      accent_bar: false
+  protocol:
+    label_zh: 协议
+    visual:
+      shape: double_border
+      border_width: 1.5
+      radius: 8
+      accent_bar: true
+  flow_step:
+    label_zh: 流程节点
+    visual:
+      shape: rect
+      border_width: 1.0
+      radius: 8
+      accent_bar: true
+  benefit:
+    label_zh: 收益节点
+    visual:
+      shape: rect
+      border_width: 1.5
+      radius: 8
+      accent_bar: true
+  owner:
+    label_zh: 归属方
+    visual:
+      shape: rect
+      border_width: 2.0
+      radius: 8
+      accent_bar: true
+  thesis:
+    label_zh: 核心判断
+    visual:
+      shape: rect
+      border_width: 2.0
+      radius: 8
+      scale: 1.15
+      accent_bar: true
 
 edge_types:
   fund_flow:
     label_zh: 资金流
-    color: "#16A34A"
-    style: solid
+    visual:
+      stroke_width: 1.2
+      stroke_dash: null
+      arrow: filled_triangle
   authorization:
     label_zh: 授权
-    color: "#7C3AED"
-    style: solid
+    visual:
+      stroke_width: 1.0
+      stroke_dash: "4,4"
+      arrow: open_triangle
   information:
     label_zh: 信息
-    color: "#2563EB"
-    style: dashed
+    visual:
+      stroke_width: 1.0
+      stroke_dash: "1,3"
+      arrow: none
   issuance:
     label_zh: 发行
-    color: "#1D4ED8"
-    style: solid
+    visual:
+      stroke_width: 1.2
+      stroke_dash: null
+      arrow: filled_triangle
   causal:
     label_zh: 因果
-    color: "#6B7280"
-    style: solid
+    visual:
+      stroke_width: 1.2
+      stroke_dash: null
+      arrow: filled_triangle
   feedback:
     label_zh: 反馈
-    color: "#EA580C"
-    style: curved
+    visual:
+      stroke_width: 1.0
+      stroke_dash: "4,4"
+      arrow: open_triangle
+  flow:
+    label_zh: 价值流
+    visual:
+      stroke_width: 1.2
+      stroke_dash: null
+      arrow: filled_triangle
+  benefit_flow:
+    label_zh: 收益流
+    visual:
+      stroke_width: 2.0
+      stroke_dash: null
+      arrow: filled_triangle_large
+  control:
+    label_zh: 控制
+    visual:
+      stroke_width: 1.0
+      stroke_dash: "4,4"
+      arrow: open_triangle
+  depends:
+    label_zh: 依赖
+    visual:
+      stroke_width: 1.0
+      stroke_dash: "1,3"
+      arrow: none
+  causes:
+    label_zh: 导致
+    visual:
+      stroke_width: 1.2
+      stroke_dash: null
+      arrow: filled_triangle
 
 weights:
   primary:
