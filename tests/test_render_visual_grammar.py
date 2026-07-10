@@ -58,6 +58,8 @@ def test_each_role_renders_its_ontology_shape(role: str) -> None:
     assert f'rx="{visual["radius"]}"' in group
     assert f'stroke-width="{visual["border_width"]:g}"' in group
     assert ('class="prism-node-accent"' in group) is bool(visual["accent_bar"])
+    if visual["accent_bar"]:
+        assert 'fill="url(#grad_bar_primary)"' in group
 
 
 def test_round_and_double_border_shapes_have_required_geometry() -> None:
@@ -82,7 +84,7 @@ def test_status_colors_come_from_theme() -> None:
         renderer.to_svg(_document(role="risk", status="negative"), ontology)
     )
 
-    assert f'fill="{theme.accent_result}"' in positive
+    assert 'fill="url(#grad_positive)"' in positive
     assert f'stroke="{theme.accent_result}"' in positive
     assert f'fill="{theme.surface}"' in negative
     assert f'stroke="{theme.accent_risk}"' in negative
@@ -145,16 +147,16 @@ edges:
     assert prism.nodes[0].status.value == "positive"
     assert prism.nodes[1].status.value == "highlight"
     assert theme.accent_result in rendered_html
-    assert f'fill="{theme.accent_result}"' in positive
+    assert 'fill="url(#grad_positive)"' in positive
     assert f'stroke="{theme.accent_result}"' in positive
-    assert f'fill="{theme.accent_result}"' in thesis
+    assert 'fill="url(#grad_highlight)"' in thesis
     assert f'stroke="{theme.accent_result}"' in thesis
     assert 'stroke-width="2"' in thesis
     assert "stroke-dasharray" not in thesis
     assert scaled[2] == pytest.approx(unscaled[2] * 1.15)
     assert scaled[3] == pytest.approx(unscaled[3] * 1.15)
-    assert "status=positive fill=#e07b5a" in caplog.text
-    assert "status=highlight fill=#e07b5a" in caplog.text
+    assert "status=positive fill=url(#grad_positive)" in caplog.text
+    assert "status=highlight fill=url(#grad_highlight)" in caplog.text
 
 
 def test_final_html_contains_visible_markers_and_positive_example_fills() -> None:
@@ -170,7 +172,8 @@ def test_final_html_contains_visible_markers_and_positive_example_fills() -> Non
     for node_id in ("reserve_yield", "lending_interest", "funding_income"):
         group = _node_group(rendered_html, node_id)
         assert 'data-status="positive"' in group
-        assert f'fill="{theme.accent_result}"' in group
+        assert 'fill="url(#grad_positive)"' in group
+        assert 'fill="url(#grad_bar_result)"' in group
     for edge in prism.edges:
         visual = ontology.edge_visual(edge.type)
         edge_path = rendered_html.split(
@@ -180,6 +183,21 @@ def test_final_html_contains_visible_markers_and_positive_example_fills() -> Non
             assert "marker-end" not in edge_path
         else:
             assert f'marker-end="url(#{visual["arrow"]})"' in edge_path
+
+
+def test_final_svg_defines_node_and_accent_bar_gradients() -> None:
+    ontology = load_ontology("financial")
+    svg = MermaidRenderer().to_svg(_document(role="benefit", status="positive"), ontology)
+
+    assert '<linearGradient id="grad_neutral"' in svg
+    assert '<linearGradient id="grad_positive"' in svg
+    assert '<linearGradient id="grad_highlight"' in svg
+    assert 'stop-color="#2a2018"' in svg
+    assert 'stop-color="#1c1612"' in svg
+    assert 'stop-color="#e07b5a"' in svg
+    assert 'stop-color="#c4613d"' in svg
+    assert '<linearGradient id="grad_bar_result"' in svg
+    assert 'stop-opacity="0.2"' in svg
 
 
 @pytest.mark.parametrize("edge_type", list(load_ontology("financial").edge_types))

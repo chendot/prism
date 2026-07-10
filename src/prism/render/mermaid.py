@@ -138,6 +138,30 @@ class MermaidRenderer(Renderer):
 
         return f"""<svg class="prism-svg" role="img" aria-label="{escape(prism.meta.title)}" width="{width}" height="{height}" viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg">
   <defs>
+    <linearGradient id="grad_neutral" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2a2018" />
+      <stop offset="100%" stop-color="#1c1612" />
+    </linearGradient>
+    <linearGradient id="grad_positive" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e07b5a" />
+      <stop offset="100%" stop-color="#c4613d" />
+    </linearGradient>
+    <linearGradient id="grad_highlight" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e07b5a" />
+      <stop offset="100%" stop-color="#c4613d" />
+    </linearGradient>
+    <linearGradient id="grad_bar_primary" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="{theme.accent_primary}" />
+      <stop offset="100%" stop-color="{theme.accent_primary}" stop-opacity="0.2" />
+    </linearGradient>
+    <linearGradient id="grad_bar_result" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="{theme.accent_result}" />
+      <stop offset="100%" stop-color="{theme.accent_result}" stop-opacity="0.2" />
+    </linearGradient>
+    <linearGradient id="grad_bar_risk" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="{theme.accent_risk}" />
+      <stop offset="100%" stop-color="{theme.accent_risk}" stop-opacity="0.2" />
+    </linearGradient>
     <marker id="filled_triangle" markerWidth="{config.arrowhead_size}" markerHeight="{config.arrowhead_size}" refX="{config.arrowhead_size}" refY="{config.arrowhead_size / 2:.1f}" orient="auto" markerUnits="strokeWidth">
       <path d="M 0 0 L {config.arrowhead_size} {config.arrowhead_size / 2:.1f} L 0 {config.arrowhead_size} z" fill="{theme.accent_primary}" />
     </marker>
@@ -1332,10 +1356,11 @@ class MermaidRenderer(Renderer):
             )
         accent_bar = ""
         if bool(visual["accent_bar"]):
+            bar_gradient = self._accent_bar_gradient(status)
             accent_bar = (
                 f'<rect class="prism-node-accent" x="{x:.1f}" y="{y:.1f}" '
                 f'width="{theme.node_accent_bar_width}" height="{height:.1f}" rx="1" '
-                f'fill="{border}" />'
+                f'fill="url(#{bar_gradient})" />'
             )
         return (
             f'<g class="node" data-node-id="{escape(node.id)}" '
@@ -1347,11 +1372,20 @@ class MermaidRenderer(Renderer):
         )
 
     def _status_colors(self, node: Node, theme: VisualTheme) -> tuple[str, str]:
-        if node.status.value in {"positive", "highlight"}:
-            return theme.accent_result, theme.accent_result
+        if node.status.value == "positive":
+            return "url(#grad_positive)", theme.accent_result
+        if node.status.value == "highlight":
+            return "url(#grad_highlight)", theme.accent_result
         if node.status.value == "negative":
             return theme.surface, theme.accent_risk
-        return theme.surface, theme.accent_primary
+        return "url(#grad_neutral)", theme.accent_primary
+
+    def _accent_bar_gradient(self, status: str) -> str:
+        if status in {"positive", "highlight"}:
+            return "grad_bar_result"
+        if status == "negative":
+            return "grad_bar_risk"
+        return "grad_bar_primary"
 
     def _stroke_dash_attribute(self, stroke_dash: object) -> str:
         if stroke_dash is None:

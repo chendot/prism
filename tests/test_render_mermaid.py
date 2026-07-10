@@ -50,11 +50,11 @@ def test_node_weight_does_not_override_status_visual_mapping() -> None:
     treasury_group = svg.split('data-node-id="treasury"', 1)[1].split("</g>", 1)[0]
 
     assert 'data-status="neutral"' in treasury_group
-    assert 'fill="#221a0e"' in treasury_group
+    assert 'fill="url(#grad_neutral)"' in treasury_group
     assert 'stroke="#c9a96e"' in treasury_group
 
 
-def test_muted_nodes_have_solid_background_to_cover_edges() -> None:
+def test_muted_nodes_have_gradient_background_to_cover_edges() -> None:
     prism = PrismDoc.from_yaml("examples/stablecoin-revenue.yaml")
     ontology = load_ontology("financial")
 
@@ -62,7 +62,7 @@ def test_muted_nodes_have_solid_background_to_cover_edges() -> None:
     redeem_fee_group = svg.split('data-node-id="redeem_fee"', 1)[1].split("</g>", 1)[0]
 
     assert 'fill="none"' not in redeem_fee_group
-    assert 'fill="#221a0e"' in redeem_fee_group
+    assert 'fill="url(#grad_neutral)"' in redeem_fee_group
 
 
 def test_same_layer_nodes_fit_within_canvas_margins() -> None:
