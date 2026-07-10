@@ -57,6 +57,15 @@ class EdgeDirection(StrEnum):
     BIDIRECTIONAL = "bidirectional"
 
 
+class NodeStatus(StrEnum):
+    """Semantic node status used by themes to resolve colors."""
+
+    NEUTRAL = "neutral"
+    POSITIVE = "positive"
+    NEGATIVE = "negative"
+    HIGHLIGHT = "highlight"
+
+
 class LoopPolarity(StrEnum):
     """Feedback loop polarity."""
 
@@ -110,6 +119,7 @@ class Node(PrismBaseModel):
     layer: int | None = None
     lane: str | None = None
     weight: str = "secondary"
+    status: NodeStatus = NodeStatus.NEUTRAL
 
     @field_validator("id")
     @classmethod
