@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 
 from prism.core.models import Ontology
@@ -41,6 +42,14 @@ def validate_prism_doc(prism: PrismDoc, ontology: Ontology | None = None) -> Pri
     if invalid_roles:
         raise PrismValidationError(
             f"Unknown role(s) for ontology '{ontology.name}': {', '.join(invalid_roles)}"
+        )
+
+    thesis_count = sum(node.role == "thesis" for node in prism.nodes)
+    if thesis_count > 2:
+        warnings.warn(
+            f"Visual grammar recommends at most 2 thesis nodes; found {thesis_count}",
+            UserWarning,
+            stacklevel=2,
         )
 
     invalid_weights = sorted(
