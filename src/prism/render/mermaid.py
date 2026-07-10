@@ -15,6 +15,7 @@ from prism.core.schema import Edge, EdgeDirection, Node, PrismDoc, RenderLane
 from prism.core.validator import validate_prism_doc
 from prism.ontologies.loader import load_ontology
 from prism.render.base import Renderer
+from prism.render.icons import ROLE_ICON_PATHS
 from prism.render.theme import VisualTheme, load_theme
 
 
@@ -1334,20 +1335,24 @@ class MermaidRenderer(Renderer):
         )
         dash = self._stroke_dash_attribute(border_dash)
         glow_filter = ' filter="url(#glow)"' if status == "highlight" else ""
-        title_lines = self._wrap_text(node.label, max(4, int(width / 18)), 2)
-        sublabel_lines = self._wrap_text(node.sublabel or "", max(6, int(width / 14)), 2)
+        icon_size = 16
+        icon_text_gap = 8
+        text_x = x + 18 + icon_size + icon_text_gap
+        text_width = width - (text_x - x) - 10
+        title_lines = self._wrap_text(node.label, max(4, int(text_width / 16)), 2)
+        sublabel_lines = self._wrap_text(node.sublabel or "", max(6, int(text_width / 13)), 2)
         title_y = y + 28 if len(title_lines) == 1 else y + 23
         text_parts = []
         for index, line in enumerate(title_lines):
             text_parts.append(
-                f'<text x="{x + 18:.1f}" y="{title_y + index * 18:.1f}" '
+                f'<text x="{text_x:.1f}" y="{title_y + index * 18:.1f}" '
                 f'fill="{text_color}" font-size="15" font-weight="{self.layout_config.title_font_weight}" '
                 f'font-family="ui-sans-serif, system-ui">{escape(line)}</text>'
             )
         sublabel_y = y + 51 if len(title_lines) == 1 else y + 56
         for index, line in enumerate(sublabel_lines[:1]):
             text_parts.append(
-                f'<text x="{x + 18:.1f}" y="{sublabel_y + index * 15:.1f}" '
+                f'<text x="{text_x:.1f}" y="{sublabel_y + index * 15:.1f}" '
                 f'fill="{text_color}" font-size="13" font-weight="400" opacity="{self.layout_config.subtitle_opacity:g}" '
                 f'font-family="ui-sans-serif, system-ui">{escape(line)}</text>'
             )
@@ -1374,13 +1379,42 @@ class MermaidRenderer(Renderer):
                 f'width="{theme.node_accent_bar_width}" height="{height:.1f}" rx="1" '
                 f'fill="url(#{bar_gradient})" />'
             )
+        icon = self._render_svg_icon(
+            node.role, x, y, height, border, bool(visual["accent_bar"]), theme
+        )
         return (
             f'<g class="node" data-node-id="{escape(node.id)}" '
             f'data-role="{escape(node.role)}" data-status="{status}">'
             f'{"".join(shape_parts)}'
             f'{accent_bar}'
+            f'{icon}'
             f'{"".join(text_parts)}'
             "</g>"
+        )
+
+    def _render_svg_icon(
+        self,
+        role: str,
+        x: float,
+        y: float,
+        height: float,
+        border: str,
+        accent_bar: bool,
+        theme: VisualTheme,
+    ) -> str:
+        path = ROLE_ICON_PATHS.get(role)
+        if path is None:
+            return ""
+        icon_size = 16
+        icon_x = x + 10
+        if accent_bar:
+            icon_x += theme.node_accent_bar_width + 8
+        icon_y = y + height / 2 - icon_size / 2
+        return (
+            f'<svg class="prism-node-icon" x="{icon_x:.1f}" y="{icon_y:.1f}" '
+            f'width="{icon_size}" height="{icon_size}" viewBox="0 0 24 24" fill="none" '
+            f'stroke="{border}" stroke-width="1.8" stroke-linecap="round" '
+            f'stroke-linejoin="round" aria-hidden="true">{path}</svg>'
         )
 
     def _status_colors(self, node: Node, theme: VisualTheme) -> tuple[str, str]:

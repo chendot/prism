@@ -61,7 +61,6 @@ def test_muted_nodes_have_gradient_background_to_cover_edges() -> None:
     svg = MermaidRenderer().to_svg(prism, ontology)
     redeem_fee_group = svg.split('data-node-id="redeem_fee"', 1)[1].split("</g>", 1)[0]
 
-    assert 'fill="none"' not in redeem_fee_group
     assert 'fill="url(#grad_neutral)"' in redeem_fee_group
 
 

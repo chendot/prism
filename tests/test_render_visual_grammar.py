@@ -1,10 +1,12 @@
 import logging
+import re
 
 import pytest
 
 from prism.core.schema import PrismDoc
 from prism.ontologies.loader import load_ontology
 from prism.render.mermaid import LayoutConfig, MermaidRenderer
+from prism.render.icons import ROLE_ICON_PATHS
 from prism.render.theme import load_theme
 
 
@@ -238,6 +240,35 @@ def test_typography_hierarchy_uses_layout_config() -> None:
     assert 'font-weight="700"' in source
     assert 'font-weight="400" opacity="0.65"' in source
     assert 'font-size="12" opacity="0.7"' in edge_label
+
+
+@pytest.mark.parametrize("role", list(load_ontology("financial").roles))
+def test_each_role_renders_an_inline_icon_inside_node_bounds(role: str) -> None:
+    ontology = load_ontology("financial")
+    svg = MermaidRenderer().to_svg(_document(role=role), ontology)
+    group = _node_group(svg)
+
+    outer = re.search(
+        r'class="node-shape node-shape-outer" x="([0-9.]+)" y="([0-9.]+)" '
+        r'width="([0-9.]+)" height="([0-9.]+)"',
+        group,
+    )
+    icon = re.search(
+        r'<svg class="prism-node-icon" x="([0-9.]+)" y="([0-9.]+)" '
+        r'width="16" height="16"[^>]*>(<path d="[^"]+" />)</svg>',
+        group,
+    )
+
+    assert outer is not None
+    assert icon is not None
+    assert ROLE_ICON_PATHS[role] in group
+    node_x, node_y, node_width, node_height = map(float, outer.groups())
+    icon_x, icon_y = map(float, icon.groups()[:2])
+    assert node_x < icon_x < icon_x + 16 < node_x + node_width
+    assert node_y < icon_y < icon_y + 16 < node_y + node_height
+
+    title_x = float(re.search(r'<text x="([0-9.]+)"', group).group(1))
+    assert title_x > icon_x + 16
 
 
 @pytest.mark.parametrize("edge_type", list(load_ontology("financial").edge_types))
