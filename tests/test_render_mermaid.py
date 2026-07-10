@@ -23,7 +23,6 @@ def test_mermaid_renderer_includes_styles_and_loops() -> None:
     assert 'fill="#c9a96e"' in html
     assert 'stroke-width="1.5"' in html
     assert 'stroke-width="2"' in html
-    assert 'width="5"' in html
     assert " C " not in html
     assert "chendot · prism" in html
     assert "Feedback loops" in html
@@ -40,7 +39,7 @@ def test_mermaid_source_keeps_node_ids() -> None:
     assert "class treasury" in mermaid
 
 
-def test_node_weight_uses_ontology_visual_mapping() -> None:
+def test_node_weight_does_not_override_status_visual_mapping() -> None:
     prism = PrismDoc.from_yaml("examples/treasury.yaml")
     data = prism.model_dump(mode="json", by_alias=True)
     data["nodes"][0]["weight"] = "primary"
@@ -50,10 +49,9 @@ def test_node_weight_uses_ontology_visual_mapping() -> None:
     svg = MermaidRenderer().to_svg(weighted, ontology)
     treasury_group = svg.split('data-node-id="treasury"', 1)[1].split("</g>", 1)[0]
 
-    assert 'fill="#e07b5a"' in treasury_group
-    assert 'stroke="#e07b5a"' in treasury_group
-    assert 'fill="#fdf6ec"' in treasury_group
-    assert 'opacity="1.0"' not in treasury_group
+    assert 'data-status="neutral"' in treasury_group
+    assert 'fill="#221a0e"' in treasury_group
+    assert 'stroke="#c9a96e"' in treasury_group
 
 
 def test_muted_nodes_have_solid_background_to_cover_edges() -> None:
@@ -64,7 +62,7 @@ def test_muted_nodes_have_solid_background_to_cover_edges() -> None:
     redeem_fee_group = svg.split('data-node-id="redeem_fee"', 1)[1].split("</g>", 1)[0]
 
     assert 'fill="none"' not in redeem_fee_group
-    assert 'fill="#1c1612"' in redeem_fee_group
+    assert 'fill="#221a0e"' in redeem_fee_group
 
 
 def test_same_layer_nodes_fit_within_canvas_margins() -> None:
@@ -571,7 +569,8 @@ def test_parallel_lanes_render_guides_and_margin_feedback_route() -> None:
     assert 'class="parallel-lanes"' in svg
     assert 'stroke="#9b7a40" stroke-width="1.5" stroke-dasharray="7 9" opacity="0.6"' in svg
     assert 'font-size="12" font-weight="650" letter-spacing="1"' in svg
-    assert 'stroke-dasharray="8 7"' in svg
+    assert 'data-edge-type="feedback"' in svg
+    assert 'stroke-dasharray="4,4"' in svg
     assert '<rect x="' in svg
     assert 'fill="#1c1612" /><text' in svg
     assert "L 40.0" in feedback_path or "L 860.0" in feedback_path

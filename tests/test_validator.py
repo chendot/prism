@@ -1,3 +1,5 @@
+import warnings
+
 import pytest
 
 from prism.core.schema import PrismDoc
@@ -70,3 +72,20 @@ def test_validator_rejects_unknown_parallel_lane() -> None:
 
     with pytest.raises(PrismValidationError, match="must match render.lanes id"):
         validate_prism_doc(invalid)
+
+
+@pytest.mark.parametrize("thesis_count", [2, 3])
+def test_validator_warns_only_above_thesis_soft_limit(thesis_count: int) -> None:
+    prism = PrismDoc.from_yaml("examples/treasury.yaml")
+    data = prism.model_dump(mode="json", by_alias=True)
+    for node in data["nodes"][:thesis_count]:
+        node["role"] = "thesis"
+    candidate = PrismDoc.model_validate(data)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        validated = validate_prism_doc(candidate)
+
+    assert validated is candidate
+    thesis_warnings = [warning for warning in caught if "thesis nodes" in str(warning.message)]
+    assert len(thesis_warnings) == (1 if thesis_count == 3 else 0)

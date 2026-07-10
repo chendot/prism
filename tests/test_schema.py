@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from prism.core.schema import PrismDoc
 
 
@@ -83,3 +86,33 @@ def test_schema_accepts_parallel_lane_fields() -> None:
         "collateral_lending",
         "delta_hedge",
     ]
+
+
+@pytest.mark.parametrize("status", ["neutral", "positive", "negative", "highlight"])
+def test_schema_accepts_valid_node_status(status: str) -> None:
+    prism = PrismDoc.from_yaml("examples/treasury.yaml")
+    data = prism.model_dump(mode="json", by_alias=True)
+    data["nodes"][0]["status"] = status
+
+    validated = PrismDoc.model_validate(data)
+
+    assert validated.nodes[0].status.value == status
+
+
+def test_schema_rejects_invalid_node_status() -> None:
+    prism = PrismDoc.from_yaml("examples/treasury.yaml")
+    data = prism.model_dump(mode="json", by_alias=True)
+    data["nodes"][0]["status"] = "urgent"
+
+    with pytest.raises(ValidationError, match="neutral|positive|negative|highlight"):
+        PrismDoc.model_validate(data)
+
+
+def test_schema_defaults_missing_node_status_to_neutral() -> None:
+    prism = PrismDoc.from_yaml("examples/treasury.yaml")
+    data = prism.model_dump(mode="json", by_alias=True)
+    data["nodes"][0].pop("status")
+
+    validated = PrismDoc.model_validate(data)
+
+    assert validated.nodes[0].status.value == "neutral"
