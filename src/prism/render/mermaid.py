@@ -138,14 +138,14 @@ class MermaidRenderer(Renderer):
 
         return f"""<svg class="prism-svg" role="img" aria-label="{escape(prism.meta.title)}" width="{width}" height="{height}" viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <marker id="arrow-filled_triangle" markerWidth="{config.arrowhead_size}" markerHeight="{config.arrowhead_size}" refX="{config.arrowhead_size}" refY="{config.arrowhead_size / 2:.1f}" orient="auto" markerUnits="strokeWidth">
-      <path d="M 0 0 L {config.arrowhead_size} {config.arrowhead_size / 2:.1f} L 0 {config.arrowhead_size} z" fill="context-stroke" />
+    <marker id="filled_triangle" markerWidth="{config.arrowhead_size}" markerHeight="{config.arrowhead_size}" refX="{config.arrowhead_size}" refY="{config.arrowhead_size / 2:.1f}" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L {config.arrowhead_size} {config.arrowhead_size / 2:.1f} L 0 {config.arrowhead_size} z" fill="{theme.accent_primary}" />
     </marker>
-    <marker id="arrow-filled_triangle_large" markerWidth="{config.arrowhead_size * 1.4:.1f}" markerHeight="{config.arrowhead_size * 1.4:.1f}" refX="{config.arrowhead_size * 1.4:.1f}" refY="{config.arrowhead_size * 0.7:.1f}" orient="auto" markerUnits="strokeWidth">
-      <path d="M 0 0 L {config.arrowhead_size * 1.4:.1f} {config.arrowhead_size * 0.7:.1f} L 0 {config.arrowhead_size * 1.4:.1f} z" fill="context-stroke" />
+    <marker id="filled_triangle_large" markerWidth="{config.arrowhead_size * 1.4:.1f}" markerHeight="{config.arrowhead_size * 1.4:.1f}" refX="{config.arrowhead_size * 1.4:.1f}" refY="{config.arrowhead_size * 0.7:.1f}" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L {config.arrowhead_size * 1.4:.1f} {config.arrowhead_size * 0.7:.1f} L 0 {config.arrowhead_size * 1.4:.1f} z" fill="{theme.accent_primary}" />
     </marker>
-    <marker id="arrow-open_triangle" markerWidth="{config.arrowhead_size}" markerHeight="{config.arrowhead_size}" refX="{config.arrowhead_size}" refY="{config.arrowhead_size / 2:.1f}" orient="auto" markerUnits="strokeWidth">
-      <path d="M 0 0 L {config.arrowhead_size} {config.arrowhead_size / 2:.1f} L 0 {config.arrowhead_size}" fill="none" stroke="context-stroke" />
+    <marker id="open_triangle" markerWidth="{config.arrowhead_size}" markerHeight="{config.arrowhead_size}" refX="{config.arrowhead_size}" refY="{config.arrowhead_size / 2:.1f}" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L {config.arrowhead_size} {config.arrowhead_size / 2:.1f} L 0 {config.arrowhead_size}" fill="none" stroke="{theme.accent_primary}" />
     </marker>
   </defs>
   <rect width="{width}" height="{height}" fill="{theme.background}" />
@@ -194,9 +194,7 @@ class MermaidRenderer(Renderer):
             visual = ontology.role_visual(role)
             node = next(node for node in prism.nodes if node.role == role and node.status.value == status)
             fill, border = self._status_colors(node, theme)
-            dash = visual.get("border_dash")
-            if status == "negative" and not dash:
-                dash = ontology.role_visual("risk").get("border_dash")
+            dash = visual.get("border_dash") if role == "risk" else None
             dash_style = f",stroke-dasharray:{dash}" if dash is not None else ""
             lines.append(
                 f"    classDef {class_name} fill:{fill},stroke:{border},"
@@ -1285,12 +1283,20 @@ class MermaidRenderer(Renderer):
         x, y, width, height = box
         visual = ontology.role_visual(node.role)
         fill, border = self._status_colors(node, theme)
+        status = node.status.value
         text_color = theme.text_primary
         border_width = float(visual["border_width"])
         radius = float(visual["radius"])
-        border_dash = visual.get("border_dash")
-        if node.status.value == "negative" and not border_dash:
-            border_dash = ontology.role_visual("risk").get("border_dash")
+        border_dash = visual.get("border_dash") if node.role == "risk" else None
+        logger.debug(
+            "Resolved node visual: id=%s role=%s status=%s fill=%s border=%s border_dash=%s",
+            node.id,
+            node.role,
+            status,
+            fill,
+            border,
+            border_dash,
+        )
         dash = self._stroke_dash_attribute(border_dash)
         title_lines = self._wrap_text(node.label, max(4, int(width / 18)), 2)
         sublabel_lines = self._wrap_text(node.sublabel or "", max(6, int(width / 14)), 2)
@@ -1333,7 +1339,7 @@ class MermaidRenderer(Renderer):
             )
         return (
             f'<g class="node" data-node-id="{escape(node.id)}" '
-            f'data-role="{escape(node.role)}" data-status="{node.status.value}">'
+            f'data-role="{escape(node.role)}" data-status="{status}">'
             f'{"".join(shape_parts)}'
             f'{accent_bar}'
             f'{"".join(text_parts)}'
@@ -1355,7 +1361,7 @@ class MermaidRenderer(Renderer):
     def _marker_attribute(self, arrow: str) -> str:
         if arrow == "none":
             return ""
-        return f' marker-end="url(#arrow-{escape(arrow)})"'
+        return f' marker-end="url(#{escape(arrow)})"'
 
     def _render_svg_loops(self, prism: PrismDoc, theme: VisualTheme) -> str:
         if not prism.loops:

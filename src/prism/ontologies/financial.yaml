@@ -21,7 +21,6 @@ roles:
     visual:
       shape: rect
       border_width: 2.0
-      border_dash: "4,3"
       radius: 8
       accent_bar: false
   constraint:
@@ -29,7 +28,6 @@ roles:
     visual:
       shape: rect
       border_width: 2.0
-      border_dash: "4,3"
       radius: 8
       accent_bar: false
   intermediary:

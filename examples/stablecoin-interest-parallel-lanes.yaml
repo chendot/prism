@@ -43,7 +43,7 @@ nodes:
     label: 储备收益
     sublabel: 利息通常先进入发行方账户
     role: asset
-    status: neutral
+    status: positive
     lane: fiat_reserve
     weight: primary
   - id: issuer_capture
@@ -71,7 +71,7 @@ nodes:
     label: 借贷利息
     sublabel: 收益来自链上杠杆需求
     role: asset
-    status: neutral
+    status: positive
     lane: collateral_lending
     weight: primary
   - id: depositor_share
@@ -99,7 +99,7 @@ nodes:
     label: 资金费收益
     sublabel: 多头支付资金费时形成收益
     role: asset
-    status: neutral
+    status: positive
     lane: delta_hedge
     weight: primary
   - id: hedge_operator
