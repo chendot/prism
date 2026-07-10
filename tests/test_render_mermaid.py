@@ -227,7 +227,7 @@ def test_edge_label_x_positions_stay_inside_canvas() -> None:
         (float(x), anchor, text)
         for x, anchor, text in re.findall(
             r'<text x="([0-9.]+)" y="[^"]+" text-anchor="([^"]+)"'
-            r' fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">'
+            r' fill="#7a6040" font-size="12" opacity="0.7" font-family="ui-sans-serif, system-ui">'
             r'([^<>]+)</text>',
             svg,
         )
@@ -407,7 +407,7 @@ def test_middle_edge_label_shifts_left_without_truncating() -> None:
     )
     label_x = float(re.search(r'x="([0-9.]+)"', label).group(1))
     label_text = re.search(r">([^<>]+)</text>", label).group(1)
-    estimated_width = renderer._estimate_text_width(label_text, font_size=13)
+    estimated_width = renderer._estimate_text_width(label_text, font_size=12)
 
     assert 'text-anchor="middle"' in label
     assert label_x + estimated_width / 2 <= 888

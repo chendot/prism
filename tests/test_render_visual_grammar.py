@@ -4,7 +4,7 @@ import pytest
 
 from prism.core.schema import PrismDoc
 from prism.ontologies.loader import load_ontology
-from prism.render.mermaid import MermaidRenderer
+from prism.render.mermaid import LayoutConfig, MermaidRenderer
 from prism.render.theme import load_theme
 
 
@@ -198,6 +198,46 @@ def test_final_svg_defines_node_and_accent_bar_gradients() -> None:
     assert 'stop-color="#c4613d"' in svg
     assert '<linearGradient id="grad_bar_result"' in svg
     assert 'stop-opacity="0.2"' in svg
+
+
+def test_highlight_nodes_use_accent_glow_filter() -> None:
+    ontology = load_ontology("financial")
+    renderer = MermaidRenderer()
+    highlight = _node_group(renderer.to_svg(_document(role="thesis", status="highlight"), ontology))
+    neutral = _node_group(renderer.to_svg(_document(role="asset"), ontology))
+    svg = renderer.to_svg(_document(role="thesis", status="highlight"), ontology)
+
+    assert '<filter id="glow"' in svg
+    assert '<feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />' in svg
+    assert 'flood-color="#e07b5a" flood-opacity="0.6"' in svg
+    assert 'class="node-shape node-shape-outer"' in highlight
+    assert 'filter="url(#glow)"' in highlight
+    assert 'filter="url(#glow)"' not in neutral
+
+
+def test_typography_hierarchy_uses_layout_config() -> None:
+    config = LayoutConfig()
+    assert config.title_font_weight == 700
+    assert config.subtitle_opacity == 0.65
+    assert config.edge_label_opacity == 0.7
+    assert config.edge_label_font_size_offset == -1
+
+    data = _document().model_dump(mode="json", by_alias=True)
+    data["nodes"][0]["sublabel"] = "Secondary detail"
+    data["edges"] = [
+        {"from": "source", "to": "target", "type": "flow", "direction": "forward", "label": "Flow"}
+    ]
+    data["nodes"].append({"id": "target", "label": "Target", "role": "asset"})
+    prism = PrismDoc.model_validate(data)
+    svg = MermaidRenderer().to_svg(prism, load_ontology("financial"))
+    source = _node_group(svg)
+    edge_label = MermaidRenderer()._render_edge_label(
+        "Flow", 100, 100, 200, 200, 100, 100, 200, 200, load_theme("warm_layered")
+    )
+
+    assert 'font-weight="700"' in source
+    assert 'font-weight="400" opacity="0.65"' in source
+    assert 'font-size="12" opacity="0.7"' in edge_label
 
 
 @pytest.mark.parametrize("edge_type", list(load_ontology("financial").edge_types))

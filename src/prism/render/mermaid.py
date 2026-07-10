@@ -40,6 +40,10 @@ class LayoutConfig:
     label_bg_padding_y: int = 2
     arrowhead_size: int = 8
     canvas_width: int = 900
+    title_font_weight: int = 700
+    subtitle_opacity: float = 0.65
+    edge_label_opacity: float = 0.7
+    edge_label_font_size_offset: int = -1
 
 
 class MermaidRenderer(Renderer):
@@ -162,6 +166,12 @@ class MermaidRenderer(Renderer):
       <stop offset="0%" stop-color="{theme.accent_risk}" />
       <stop offset="100%" stop-color="{theme.accent_risk}" stop-opacity="0.2" />
     </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+      <feFlood flood-color="{theme.accent_result}" flood-opacity="0.6" result="glow-color" />
+      <feComposite in="glow-color" in2="blur" operator="in" result="glow" />
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
     <marker id="filled_triangle" markerWidth="{config.arrowhead_size}" markerHeight="{config.arrowhead_size}" refX="{config.arrowhead_size}" refY="{config.arrowhead_size / 2:.1f}" orient="auto" markerUnits="strokeWidth">
       <path d="M 0 0 L {config.arrowhead_size} {config.arrowhead_size / 2:.1f} L 0 {config.arrowhead_size} z" fill="{theme.accent_primary}" />
     </marker>
@@ -565,7 +575,7 @@ class MermaidRenderer(Renderer):
         theme: VisualTheme,
     ) -> str:
         config = self.layout_config
-        font_size = config.arrowhead_size + config.label_bg_padding_x
+        font_size = config.arrowhead_size + config.label_bg_padding_x + config.edge_label_font_size_offset
         padding_x = config.label_bg_padding_x
         padding_y = config.label_bg_padding_y
         estimated_width = self._estimate_text_width(text, font_size)
@@ -585,7 +595,7 @@ class MermaidRenderer(Renderer):
                     f'width="{rect_right - rect_x:.1f}" height="{rect_bottom - rect_y:.1f}" '
                     f'fill="{theme.background}" />'
                     f'<text x="{label_x:.1f}" y="{adjusted_y:.1f}" text-anchor="middle" '
-                    f'fill="{theme.text_secondary}" font-size="{font_size}" '
+                    f'fill="{theme.text_secondary}" font-size="{font_size}" opacity="{config.edge_label_opacity:g}" '
                     f'font-family="ui-sans-serif, system-ui">{escape(text)}</text>'
                 )
             adjusted_y -= config.arrowhead_size + config.label_bg_padding_y * 2
@@ -1268,7 +1278,8 @@ class MermaidRenderer(Renderer):
         right_margin = 12
         max_x = canvas_width - right_margin
         label_text = text
-        estimated_width = self._estimate_text_width(label_text, font_size=13)
+        font_size = 13 + self.layout_config.edge_label_font_size_offset
+        estimated_width = self._estimate_text_width(label_text, font_size=font_size)
         raw_label_x = (start_x + end_x) / 2
         label_y = (start_y + end_y) / 2 - 8
         text_anchor = "end" if raw_label_x > 600 else "middle"
@@ -1290,7 +1301,7 @@ class MermaidRenderer(Renderer):
 
         return (
             f'<text x="{label_x:.1f}" y="{label_y:.1f}" text-anchor="{text_anchor}" '
-            f'fill="{theme.text_secondary}" font-size="13" '
+            f'fill="{theme.text_secondary}" font-size="{font_size}" opacity="{self.layout_config.edge_label_opacity:g}" '
             f'font-family="ui-sans-serif, system-ui">{escape(label_text)}</text>'
         )
 
@@ -1322,6 +1333,7 @@ class MermaidRenderer(Renderer):
             border_dash,
         )
         dash = self._stroke_dash_attribute(border_dash)
+        glow_filter = ' filter="url(#glow)"' if status == "highlight" else ""
         title_lines = self._wrap_text(node.label, max(4, int(width / 18)), 2)
         sublabel_lines = self._wrap_text(node.sublabel or "", max(6, int(width / 14)), 2)
         title_y = y + 28 if len(title_lines) == 1 else y + 23
@@ -1329,21 +1341,21 @@ class MermaidRenderer(Renderer):
         for index, line in enumerate(title_lines):
             text_parts.append(
                 f'<text x="{x + 18:.1f}" y="{title_y + index * 18:.1f}" '
-                f'fill="{text_color}" font-size="15" font-weight="650" '
+                f'fill="{text_color}" font-size="15" font-weight="{self.layout_config.title_font_weight}" '
                 f'font-family="ui-sans-serif, system-ui">{escape(line)}</text>'
             )
         sublabel_y = y + 51 if len(title_lines) == 1 else y + 56
         for index, line in enumerate(sublabel_lines[:1]):
             text_parts.append(
                 f'<text x="{x + 18:.1f}" y="{sublabel_y + index * 15:.1f}" '
-                f'fill="{text_color}" font-size="13" opacity="0.78" '
+                f'fill="{text_color}" font-size="13" font-weight="400" opacity="{self.layout_config.subtitle_opacity:g}" '
                 f'font-family="ui-sans-serif, system-ui">{escape(line)}</text>'
             )
 
         shape_parts = [
             f'<rect class="node-shape node-shape-outer" x="{x:.1f}" y="{y:.1f}" '
             f'width="{width:.1f}" height="{height:.1f}" rx="{radius:g}" fill="{fill}" '
-            f'stroke="{border}" stroke-width="{border_width:g}"{dash} />'
+            f'stroke="{border}" stroke-width="{border_width:g}"{dash}{glow_filter} />'
         ]
         if visual["shape"] == "double_border":
             inner_gap = 2.0
