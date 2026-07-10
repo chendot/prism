@@ -240,7 +240,8 @@ surface: "#221a0e"
 surface_border: "#4a3318"
 accent_primary: "#c9a96e"    # 琥珀金 — 政策层、主流向
 accent_secondary: "#9b7a40"  # 暗金 — 中间传导层
-accent_danger: "#e07b5a"     # 铜红 — 压力节点、输出层、反馈循环
+accent_result: "#e07b5a"     # 铜红 — 正向结果、高亮、核心判断
+accent_risk: "#e07b5a"       # 铜红 — 风险、负向节点的边框
 text_primary: "#e8d5b0"
 text_secondary: "#7a6040"
 node_accent_bar_width: 3     # px，节点左侧彩色竖条

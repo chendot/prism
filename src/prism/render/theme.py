@@ -22,7 +22,8 @@ class VisualTheme:
     surface_border: str
     accent_primary: str
     accent_secondary: str
-    accent_danger: str
+    accent_result: str
+    accent_risk: str
     text_primary: str
     text_secondary: str
     node_accent_bar_width: int
@@ -46,7 +47,8 @@ def load_theme(name: str | None) -> VisualTheme:
         surface_border=data["surface_border"],
         accent_primary=data["accent_primary"],
         accent_secondary=data["accent_secondary"],
-        accent_danger=data["accent_danger"],
+        accent_result=data["accent_result"],
+        accent_risk=data["accent_risk"],
         text_primary=data["text_primary"],
         text_secondary=data["text_secondary"],
         node_accent_bar_width=int(data["node_accent_bar_width"]),

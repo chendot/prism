@@ -145,8 +145,8 @@ class MermaidRenderer(Renderer):
     <marker id="arrow-secondary" markerWidth="{config.arrowhead_size}" markerHeight="{config.arrowhead_size}" refX="{config.arrowhead_size}" refY="{config.arrowhead_size / 2:.1f}" orient="auto" markerUnits="strokeWidth">
       <path d="M 0 0 L {config.arrowhead_size} {config.arrowhead_size / 2:.1f} L 0 {config.arrowhead_size} z" fill="{theme.accent_secondary}" />
     </marker>
-    <marker id="arrow-danger" markerWidth="{config.arrowhead_size}" markerHeight="{config.arrowhead_size}" refX="{config.arrowhead_size}" refY="{config.arrowhead_size / 2:.1f}" orient="auto" markerUnits="strokeWidth">
-      <path d="M 0 0 L {config.arrowhead_size} {config.arrowhead_size / 2:.1f} L 0 {config.arrowhead_size} z" fill="{theme.accent_danger}" />
+    <marker id="arrow-risk" markerWidth="{config.arrowhead_size}" markerHeight="{config.arrowhead_size}" refX="{config.arrowhead_size}" refY="{config.arrowhead_size / 2:.1f}" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L {config.arrowhead_size} {config.arrowhead_size / 2:.1f} L 0 {config.arrowhead_size} z" fill="{theme.accent_risk}" />
     </marker>
   </defs>
   <rect width="{width}" height="{height}" fill="{theme.background}" />
@@ -196,13 +196,13 @@ class MermaidRenderer(Renderer):
 
         if prism.render.highlight_nodes:
             for node_id in prism.render.highlight_nodes:
-                lines.append(f"    style {node_id} stroke:{theme.accent_danger},stroke-width:3px")
+                lines.append(f"    style {node_id} stroke:{theme.accent_result},stroke-width:3px")
 
         return "\n".join(lines)
 
     def _edge_color(self, edge_type: str, theme: VisualTheme) -> str:
         if edge_type == "feedback":
-            return theme.accent_danger
+            return theme.accent_risk
         if edge_type in {"information", "authorization"}:
             return theme.accent_secondary
         return theme.accent_primary
@@ -279,7 +279,7 @@ class MermaidRenderer(Renderer):
 
             marker = {
                 theme.accent_secondary: "arrow-secondary",
-                theme.accent_danger: "arrow-danger",
+                theme.accent_risk: "arrow-risk",
             }.get(color, "arrow-primary")
             label = self._parallel_edge_label(edge, positions, theme, label_kind)
             parts.append(
@@ -969,7 +969,7 @@ class MermaidRenderer(Renderer):
             color = self._edge_color(edge.type, theme)
             marker = {
                 theme.accent_secondary: "arrow-secondary",
-                theme.accent_danger: "arrow-danger",
+                theme.accent_risk: "arrow-risk",
             }.get(color, "arrow-primary")
 
             points = self._edge_route_points(
