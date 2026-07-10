@@ -140,15 +140,15 @@ edges:
     prism = PrismDoc.from_yaml(str(path))
     caplog.set_level(logging.DEBUG, logger="prism.render.mermaid")
 
-    rendered_html = renderer.render(prism, ontology)
-    positive = _node_group(rendered_html, "positive_result")
-    thesis = _node_group(rendered_html, "core_thesis")
+    rendered_svg = renderer.to_svg(prism, ontology)
+    positive = _node_group(rendered_svg, "positive_result")
+    thesis = _node_group(rendered_svg, "core_thesis")
     unscaled = renderer._layout_nodes(prism)["positions"]["core_thesis"]
     scaled = renderer._layout_nodes(prism, ontology)["positions"]["core_thesis"]
 
     assert prism.nodes[0].status.value == "positive"
     assert prism.nodes[1].status.value == "highlight"
-    assert theme.accent_result in rendered_html
+    assert theme.accent_result in rendered_svg
     assert 'fill="url(#grad_positive)"' in positive
     assert f'stroke="{theme.accent_result}"' in positive
     assert 'fill="url(#grad_highlight)"' in thesis
@@ -166,19 +166,19 @@ def test_final_html_contains_visible_markers_and_positive_example_fills() -> Non
     ontology = load_ontology("financial")
     theme = load_theme("warm_layered")
 
-    rendered_html = MermaidRenderer().render(prism, ontology)
+    rendered_svg = MermaidRenderer().to_svg(prism, ontology)
 
-    assert '<marker id="filled_triangle"' in rendered_html
-    assert '<marker id="filled_triangle_large"' in rendered_html
-    assert '<marker id="open_triangle"' in rendered_html
+    assert '<marker id="filled_triangle"' in rendered_svg
+    assert '<marker id="filled_triangle_large"' in rendered_svg
+    assert '<marker id="open_triangle"' in rendered_svg
     for node_id in ("reserve_yield", "lending_interest", "funding_income"):
-        group = _node_group(rendered_html, node_id)
+        group = _node_group(rendered_svg, node_id)
         assert 'data-status="positive"' in group
         assert 'fill="url(#grad_positive)"' in group
         assert 'fill="url(#grad_bar_result)"' in group
     for edge in prism.edges:
         visual = ontology.edge_visual(edge.type)
-        edge_path = rendered_html.split(
+        edge_path = rendered_svg.split(
             f'data-edge-type="{edge.type}"', 1
         )[1].split("/>", 1)[0]
         if visual["arrow"] == "none":
@@ -194,10 +194,10 @@ def test_final_svg_defines_node_and_accent_bar_gradients() -> None:
     assert '<linearGradient id="grad_neutral"' in svg
     assert '<linearGradient id="grad_positive"' in svg
     assert '<linearGradient id="grad_highlight"' in svg
-    assert 'stop-color="#2a2018"' in svg
-    assert 'stop-color="#1c1612"' in svg
-    assert 'stop-color="#e07b5a"' in svg
-    assert 'stop-color="#c4613d"' in svg
+    assert 'stop-color="#2b211b"' in svg
+    assert 'stop-color="#1f1814"' in svg
+    assert 'stop-color="#ef805d"' in svg
+    assert 'stop-opacity="0.82"' in svg
     assert '<linearGradient id="grad_bar_result"' in svg
     assert 'stop-opacity="0.2"' in svg
 
@@ -211,17 +211,21 @@ def test_highlight_nodes_use_accent_glow_filter() -> None:
 
     assert '<filter id="glow"' in svg
     assert '<feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />' in svg
-    assert 'flood-color="#e07b5a" flood-opacity="0.6"' in svg
+    assert 'flood-color="#ef805d" flood-opacity="0.6"' in svg
     assert 'class="node-shape node-shape-outer"' in highlight
     assert 'filter="url(#glow)"' in highlight
     assert 'filter="url(#glow)"' not in neutral
+    assert 'fill="#1f1814" font-size="15"' in highlight
+    assert 'stroke="#1f1814"' in highlight
+    assert 'fill="#f7e6c4" font-size="15"' in neutral
 
 
 def test_typography_hierarchy_uses_layout_config() -> None:
     config = LayoutConfig()
     assert config.title_font_weight == 700
-    assert config.subtitle_opacity == 0.65
-    assert config.edge_label_opacity == 0.7
+    assert config.subtitle_opacity == 0.84
+    assert config.edge_label_opacity == 0.94
+    assert config.edge_opacity == 0.96
     assert config.edge_label_font_size_offset == -1
 
     data = _document().model_dump(mode="json", by_alias=True)
@@ -238,8 +242,8 @@ def test_typography_hierarchy_uses_layout_config() -> None:
     )
 
     assert 'font-weight="700"' in source
-    assert 'font-weight="400" opacity="0.65"' in source
-    assert 'font-size="12" opacity="0.7"' in edge_label
+    assert 'font-weight="400" opacity="0.84"' in source
+    assert 'font-size="12" opacity="0.94"' in edge_label
 
 
 @pytest.mark.parametrize("role", list(load_ontology("financial").roles))

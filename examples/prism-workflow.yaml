@@ -1,0 +1,166 @@
+meta:
+  title: "Prism 项目流程与设计逻辑"
+  subtitle: "以 prism.yaml 为核心，隔离 Research / Compression / Render"
+  topic: "Prism 项目的工作流程、层边界与核心设计原则"
+  ontology: financial
+  template: layer_stack
+  visual_theme: warm_layered
+  target_format: xiaohongshu_card
+  audience: intermediate
+  language: zh
+  tags:
+    - prism
+    - architecture
+    - workflow
+    - layer_stack
+
+diagram:
+  type: layer
+  direction: TD
+
+nodes:
+  - id: complex_topic
+    label: 复杂主题
+    sublabel: 用户观点、文章或问题
+    role: entry
+    layer: 0
+    weight: secondary
+    status: neutral
+  - id: generation_contracts
+    label: 生成契约
+    sublabel: 结构模板 · 领域词表 · 视觉主题
+    role: constraint
+    layer: 1
+    weight: secondary
+    status: neutral
+  - id: optional_research
+    label: 可选研究
+    sublabel: Layer 1 · findings.json；允许跳过
+    role: flow_step
+    layer: 1
+    weight: muted
+    status: neutral
+  - id: template_choice
+    label: 结构判断
+    sublabel: Layer 2A · value / causal / layer stack
+    role: flow_step
+    layer: 1
+    weight: secondary
+    status: neutral
+  - id: yaml_generation
+    label: YAML 生成
+    sublabel: Layer 2B · schema + template + ontology
+    role: flow_step
+    layer: 2
+    weight: secondary
+    status: neutral
+  - id: validator_gate
+    label: Validator 守门
+    sublabel: 校验 schema、词表、引用与跨字段约束
+    role: protocol
+    layer: 3
+    weight: secondary
+    status: neutral
+  - id: prism_yaml
+    label: prism.yaml
+    sublabel: 唯一 canonical 资产，也是层间显式契约
+    role: thesis
+    layer: 4
+    weight: primary
+    status: highlight
+  - id: deterministic_renderer
+    label: 确定性渲染
+    sublabel: Layer 3 · 只读 validated prism.yaml
+    role: protocol
+    layer: 5
+    weight: secondary
+    status: neutral
+  - id: version_control
+    label: 版本控制与复用
+    sublabel: YAML 可读、可 diff、可跨 renderer 迁移
+    role: owner
+    layer: 5
+    weight: muted
+    status: neutral
+  - id: derived_outputs
+    label: 多种派生视图
+    sublabel: HTML / SVG / Mermaid，可重新生成
+    role: benefit
+    layer: 6
+    weight: secondary
+    status: positive
+
+edges:
+  - from: complex_topic
+    to: optional_research
+    label: 可选补充事实
+    type: information
+    direction: forward
+  - from: complex_topic
+    to: template_choice
+    label: 判断解释结构
+    type: information
+    direction: forward
+  - from: generation_contracts
+    to: yaml_generation
+    type: control
+    direction: forward
+  - from: optional_research
+    to: yaml_generation
+    label: findings 可选输入
+    type: information
+    direction: forward
+  - from: template_choice
+    to: yaml_generation
+    label: 注入结构先验
+    type: control
+    direction: forward
+  - from: yaml_generation
+    to: validator_gate
+    label: 提交候选 YAML
+    type: flow
+    direction: forward
+  - from: validator_gate
+    to: yaml_generation
+    label: 失败后携错误重试
+    type: feedback
+    direction: backward
+  - from: validator_gate
+    to: prism_yaml
+    label: 通过后形成契约
+    type: flow
+    direction: forward
+  - from: prism_yaml
+    to: deterministic_renderer
+    label: 驱动渲染
+    type: flow
+    direction: forward
+  - from: prism_yaml
+    to: version_control
+    label: 保存核心资产
+    type: information
+    direction: forward
+  - from: deterministic_renderer
+    to: derived_outputs
+    label: 生成可发布视图
+    type: benefit_flow
+    direction: forward
+
+loops:
+  - id: validate_retry_loop
+    label: validate-retry：最多重试 2 次
+    nodes:
+      - yaml_generation
+      - validator_gate
+    polarity: negative
+
+render:
+  template: layer_stack
+  style: default
+  show_loops: true
+  lanes: []
+  highlight_nodes:
+    - prism_yaml
+    - derived_outputs
+  highlight_edges: []
+  renderer: mermaid

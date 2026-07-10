@@ -1,0 +1,9 @@
+{
+  "name": "prism-renderer-assets",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Pinned browser-side assets vendored into the Prism Python package.",
+  "dependencies": {
+    "@dagrejs/dagre": "3.0.0"
+  }
+}

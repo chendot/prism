@@ -9,24 +9,33 @@ from prism.render.theme import load_theme
 def test_mermaid_renderer_includes_styles_and_loops() -> None:
     prism = PrismDoc.from_yaml("examples/treasury.yaml")
     ontology = load_ontology("financial")
-    html = MermaidRenderer().render(prism, ontology)
+    renderer = MermaidRenderer()
+    html = renderer.render(prism, ontology)
+    svg = renderer.to_svg(prism, ontology)
 
-    assert '<svg class="prism-svg"' in html
-    assert 'width="900" height="1200"' in html
-    assert 'viewBox="0 0 900 1200"' in html
+    assert 'data-layout-engine="dagre"' in html
+    assert 'id="prism-payload" type="application/json"' in html
+    assert '"dagre_version":"3.0.0"' in html
+    assert 'PrismDagre.render(' in html
+    assert '<script src=' not in html
+    assert "var dagre=" in html
     assert "width: min(900px" in html
     assert "aspect-ratio: 3 / 4" not in html
     assert "height: auto" in html
+    assert "overflow-x: hidden;" in html
+    assert "overflow-y: auto;" in html
+    assert "place-items: start center;" in html
     assert "美国财政部" in html
-    assert "background: #1c1612" in html
-    assert 'class="prism-node-accent"' in html
-    assert 'fill="#c9a96e"' in html
-    assert 'stroke-width="1.5"' in html
-    assert 'stroke-width="2"' in html
-    assert " C " not in html
-    assert "chendot · prism" in html
-    assert "Feedback loops" in html
-    assert "利率-需求反馈" in html
+    assert "background: #1f1814" in html
+    assert '<svg class="prism-svg"' in svg
+    assert 'class="prism-node-accent"' in svg
+    assert 'fill="#e5bc6a"' in svg
+    assert 'stroke-width="1.5"' in svg
+    assert 'stroke-width="2"' in svg
+    assert " C " not in svg
+    assert "chendot · prism" in svg
+    assert "Feedback loops" in svg
+    assert "利率-需求反馈" in svg
     assert '<section class="loops">' not in html
 
 
@@ -51,7 +60,7 @@ def test_node_weight_does_not_override_status_visual_mapping() -> None:
 
     assert 'data-status="neutral"' in treasury_group
     assert 'fill="url(#grad_neutral)"' in treasury_group
-    assert 'stroke="#c9a96e"' in treasury_group
+    assert 'stroke="#e5bc6a"' in treasury_group
 
 
 def test_muted_nodes_have_gradient_background_to_cover_edges() -> None:
@@ -226,7 +235,7 @@ def test_edge_label_x_positions_stay_inside_canvas() -> None:
         (float(x), anchor, text)
         for x, anchor, text in re.findall(
             r'<text x="([0-9.]+)" y="[^"]+" text-anchor="([^"]+)"'
-            r' fill="#7a6040" font-size="12" opacity="0.7" font-family="ui-sans-serif, system-ui">'
+            r' fill="#c6a878" font-size="12" opacity="0.94" font-family="ui-sans-serif, system-ui">'
             r'([^<>]+)</text>',
             svg,
         )
@@ -293,6 +302,139 @@ def test_edges_from_same_side_are_fanned_out() -> None:
     assert len(start_x_values) >= 3
     assert len(set(start_x_values)) == len(start_x_values)
     assert sorted(start_x_values)[1] - sorted(start_x_values)[0] == 12
+
+
+def test_route_planner_assigns_distinct_gutter_tracks() -> None:
+    prism = PrismDoc.model_validate(
+        {
+            "meta": {
+                "title": "Tracks",
+                "topic": "Tracks",
+                "ontology": "financial",
+                "audience": "beginner",
+                "language": "zh",
+            },
+            "diagram": {"type": "layer", "direction": "TD"},
+            "nodes": [
+                {"id": "source", "label": "来源", "role": "entry", "layer": 0},
+                {"id": "left", "label": "左", "role": "asset", "layer": 1},
+                {"id": "center", "label": "中", "role": "asset", "layer": 1},
+                {"id": "right", "label": "右", "role": "asset", "layer": 1},
+            ],
+            "edges": [
+                {"from": "source", "to": target, "type": "control", "direction": "forward"}
+                for target in ("left", "center", "right")
+            ],
+            "render": {"renderer": "mermaid"},
+        }
+    )
+    renderer = MermaidRenderer()
+    positions = renderer._layout_nodes(prism, load_ontology("financial"))["positions"]
+    routes = renderer._plan_edge_routes(prism.edges, positions)
+
+    gutter_y_values = [routes[index][1][1] for index in range(3)]
+
+    assert len(set(gutter_y_values)) == 3
+    assert sorted(gutter_y_values)[1] - sorted(gutter_y_values)[0] == 12
+
+
+def test_route_planner_assigns_distinct_multirow_center_tracks() -> None:
+    prism = PrismDoc.model_validate(
+        {
+            "meta": {
+                "title": "Center tracks",
+                "topic": "Center tracks",
+                "ontology": "financial",
+                "audience": "beginner",
+                "language": "zh",
+            },
+            "diagram": {"type": "layer", "direction": "TD"},
+            "nodes": [
+                {"id": "left_source", "label": "左来源", "role": "entry", "layer": 0},
+                {"id": "right_source", "label": "右来源", "role": "entry", "layer": 0},
+                {"id": "left_blocker", "label": "左中间", "role": "asset", "layer": 1},
+                {"id": "right_blocker", "label": "右中间", "role": "asset", "layer": 1},
+                {"id": "target", "label": "目标", "role": "asset", "layer": 2},
+            ],
+            "edges": [
+                {"from": source, "to": "target", "type": "control", "direction": "forward"}
+                for source in ("left_source", "right_source")
+            ],
+            "render": {"renderer": "mermaid"},
+        }
+    )
+    renderer = MermaidRenderer()
+    positions = renderer._layout_nodes(prism, load_ontology("financial"))["positions"]
+    routes = renderer._plan_edge_routes(prism.edges, positions)
+    center_x_values = [routes[index][2][0] for index in range(2)]
+
+    assert len(set(center_x_values)) == 2
+    assert abs(center_x_values[0] - center_x_values[1]) >= 12
+
+
+def test_route_planner_assigns_distinct_side_rails() -> None:
+    prism = PrismDoc.model_validate(
+        {
+            "meta": {
+                "title": "Rails",
+                "topic": "Rails",
+                "ontology": "financial",
+                "audience": "beginner",
+                "language": "zh",
+            },
+            "diagram": {"type": "layer", "direction": "TD"},
+            "nodes": [
+                {"id": "source", "label": "来源", "role": "entry", "layer": 0},
+                {"id": "step_one", "label": "一", "role": "flow_step", "layer": 1},
+                {"id": "step_two", "label": "二", "role": "flow_step", "layer": 2},
+                {"id": "target_one", "label": "目标一", "role": "asset", "layer": 3},
+                {"id": "target_two", "label": "目标二", "role": "asset", "layer": 4},
+            ],
+            "edges": [
+                {"from": "source", "to": "target_one", "type": "control", "direction": "forward"},
+                {"from": "source", "to": "target_two", "type": "control", "direction": "forward"},
+            ],
+            "render": {"renderer": "mermaid"},
+        }
+    )
+    renderer = MermaidRenderer()
+    positions = renderer._layout_nodes(prism, load_ontology("financial"))["positions"]
+    routes = renderer._plan_edge_routes(prism.edges, positions)
+    rail_x_values = [routes[index][2][0] for index in range(2)]
+
+    assert len(set(rail_x_values)) == 2
+    assert all(x <= 40 or x >= 860 for x in rail_x_values)
+
+
+def test_adjacent_feedback_uses_separate_outbound_and_return_tracks() -> None:
+    prism = PrismDoc.model_validate(
+        {
+            "meta": {
+                "title": "Feedback",
+                "topic": "Feedback",
+                "ontology": "financial",
+                "audience": "beginner",
+                "language": "zh",
+            },
+            "diagram": {"type": "layer", "direction": "TD"},
+            "nodes": [
+                {"id": "generate", "label": "生成", "role": "flow_step", "layer": 0},
+                {"id": "validate", "label": "验证", "role": "protocol", "layer": 1},
+            ],
+            "edges": [
+                {"from": "generate", "to": "validate", "type": "flow", "direction": "forward"},
+                {"from": "validate", "to": "generate", "type": "feedback", "direction": "backward"},
+            ],
+            "render": {"renderer": "mermaid"},
+        }
+    )
+    renderer = MermaidRenderer()
+    positions = renderer._layout_nodes(prism, load_ontology("financial"))["positions"]
+    feedback_route = renderer._plan_edge_routes(prism.edges, positions)[1]
+
+    assert feedback_route[1][1] != feedback_route[3][1]
+    assert feedback_route[2][0] >= 860
+    assert feedback_route[2][0] == feedback_route[3][0]
 
 
 def test_risk_edge_prefers_right_margin_route() -> None:
@@ -464,19 +606,32 @@ def test_feedback_loops_render_inside_svg_surface() -> None:
     prism = PrismDoc.from_yaml("examples/fed_rate_hike.yaml")
     ontology = load_ontology("financial")
 
-    html = MermaidRenderer().render(prism, ontology)
+    svg = MermaidRenderer().to_svg(prism, ontology)
     loop_rect = re.search(
         r'<rect x="48" y="([0-9]+)" width="804" height="([0-9]+)" rx="10" '
-        r'fill="#1c1612"',
-        html,
+        r'fill="#1f1814"',
+        svg,
     )
 
-    assert '<section class="loops">' not in html
-    assert 'class="feedback-loops"' in html
-    assert 'clip-path="url(#feedback-loops-clip)"' in html
+    assert 'class="feedback-loops"' in svg
+    assert 'clip-path="url(#feedback-loops-clip)"' in svg
     assert loop_rect is not None
     assert int(loop_rect.group(1)) + int(loop_rect.group(2)) <= 1200
-    assert 'fill="#ffffff"' not in html
+    assert 'fill="#ffffff"' not in svg
+
+
+def test_feedback_edge_is_not_drawn_twice_when_loop_panel_is_visible() -> None:
+    prism = PrismDoc.from_yaml("examples/fed_rate_hike.yaml")
+    ontology = load_ontology("financial")
+    renderer = MermaidRenderer()
+
+    with_loop_panel = renderer.to_svg(prism, ontology)
+    data = prism.model_dump(mode="json", by_alias=True)
+    data["render"]["show_loops"] = False
+    without_loop_panel = renderer.to_svg(PrismDoc.model_validate(data), ontology)
+
+    assert 'data-edge-type="feedback"' not in with_loop_panel
+    assert 'data-edge-type="feedback"' in without_loop_panel
 
 
 def test_feedback_loops_truncate_when_too_many_items() -> None:
@@ -498,7 +653,7 @@ def test_feedback_loops_truncate_when_too_many_items() -> None:
     loop_text_y_values = [
         int(value)
         for value in re.findall(
-            r'<text x="62" y="([0-9]+)" fill="#7a6040" font-size="12"',
+                r'<text x="62" y="([0-9]+)" fill="#c6a878" font-size="12"',
             svg,
         )
     ]
@@ -558,7 +713,7 @@ def test_parallel_lanes_render_guides_and_margin_feedback_route() -> None:
     assert (
         f'<rect x="0" y="0" width="{layout["width"]}" height="{layout["height"]}"'
         in svg
-        and 'rx="16" fill="none" stroke="#4a3318" stroke-width="1.5"'
+        and 'rx="16" fill="none" stroke="#6f522e" stroke-width="1.5"'
         in svg
     )
     assert 'stroke-dasharray' not in svg.split('<rect x="0" y="0"', 1)[1].split("/>", 1)[0]
@@ -566,12 +721,12 @@ def test_parallel_lanes_render_guides_and_margin_feedback_route() -> None:
     assert f'y="{int(layout["height"]) - 16}"' in svg
     assert "chendot · prism" in svg
     assert 'class="parallel-lanes"' in svg
-    assert 'stroke="#9b7a40" stroke-width="1.5" stroke-dasharray="7 9" opacity="0.6"' in svg
+    assert 'stroke="#c9934f" stroke-width="1.5" stroke-dasharray="7 9" opacity="0.6"' in svg
     assert 'font-size="12" font-weight="650" letter-spacing="1"' in svg
     assert 'data-edge-type="feedback"' in svg
     assert 'stroke-dasharray="4,4"' in svg
     assert '<rect x="' in svg
-    assert 'fill="#1c1612" /><text' in svg
+    assert 'fill="#1f1814" /><text' in svg
     assert "L 40.0" in feedback_path or "L 860.0" in feedback_path
     assert "L 450.0" not in feedback_path
 
@@ -603,7 +758,7 @@ def test_parallel_lanes_vertical_edge_label_uses_gap_midpoint() -> None:
     label = renderer._parallel_edge_label(edge, positions, theme, "vertical")
 
     assert f'y="{expected_y:.1f}"' in label
-    assert 'fill="#1c1612"' in label
+    assert 'fill="#1f1814"' in label
 
 
 def test_parallel_lanes_skips_invalid_edges_with_warning(caplog) -> None:

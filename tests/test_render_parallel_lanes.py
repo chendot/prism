@@ -25,7 +25,7 @@ def _label_rects(svg: str) -> list[tuple[float, float, float, float]]:
     rects = []
     for x, y, width, height in re.findall(
         r'<rect x="([0-9.]+)" y="([0-9.]+)" width="([0-9.]+)" '
-        r'height="([0-9.]+)" fill="#1c1612"',
+        r'height="([0-9.]+)" fill="#1f1814"',
         edge_group,
     ):
         left = float(x)

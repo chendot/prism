@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass
 from html import escape
 from itertools import count
+import json
 import logging
 from math import ceil
+from pathlib import Path
 import re
 
 from prism.core.models import Ontology
@@ -20,6 +23,9 @@ from prism.render.theme import VisualTheme, load_theme
 
 
 logger = logging.getLogger(__name__)
+DAGRE_VERSION = "3.0.0"
+DAGRE_VENDOR_PATH = Path(__file__).resolve().parent / "vendor" / "dagre.min.js"
+DAGRE_RENDERER_PATH = Path(__file__).resolve().parent / "dagre_renderer.js"
 
 
 class RenderError(RuntimeError):
@@ -33,6 +39,7 @@ class LayoutConfig:
     lane_padding: int = 40
     node_gap: int = 56
     node_height: int = 64
+    node_width: int = 280
     node_width_ratio: float = 0.85
     fanout_curve_height: int = 80
     convergence_curve_height: int = 48
@@ -42,23 +49,49 @@ class LayoutConfig:
     arrowhead_size: int = 8
     canvas_width: int = 900
     title_font_weight: int = 700
-    subtitle_opacity: float = 0.65
-    edge_label_opacity: float = 0.7
+    subtitle_opacity: float = 0.84
+    edge_label_opacity: float = 0.94
+    edge_opacity: float = 0.96
     edge_label_font_size_offset: int = -1
+    edge_port_gap: int = 12
+    edge_track_gap: int = 12
+    edge_route_margin: int = 40
+    edge_outer_margin: int = 16
+    node_route_clearance: int = 64
+    node_column_gap: int = 40
+    node_title_font_size: int = 15
+    node_subtitle_font_size: int = 13
+    edge_label_font_size: int = 12
+    loop_font_size: int = 13
+    watermark_font_size: int = 18
+    icon_size: int = 16
+    node_text_padding: int = 18
 
 
 class MermaidRenderer(Renderer):
-    """Render a validated Prism document to self-contained Mermaid HTML."""
+    """Render a validated Prism document with a bundled dagre runtime."""
 
     def __init__(self, layout_config: LayoutConfig | None = None) -> None:
         self.layout_config = layout_config or LayoutConfig()
 
     def render(self, prism: PrismDoc, ontology: Ontology) -> str:
-        """Return an HTML document containing a Mermaid diagram."""
+        """Return self-contained HTML that lays out and draws Prism with dagre."""
 
         validate_prism_doc(prism, ontology)
         theme = load_theme(prism.meta.visual_theme)
-        diagram_svg = self.to_svg(prism, ontology, theme)
+        payload = {
+            "prism": prism.model_dump(mode="json", by_alias=True),
+            "ontology": asdict(ontology),
+            "theme": asdict(theme),
+            "layout": asdict(self.layout_config),
+            "icons": ROLE_ICON_PATHS,
+            "dagre_version": DAGRE_VERSION,
+        }
+        payload_json = json.dumps(
+            payload, ensure_ascii=False, separators=(",", ":")
+        ).replace("<", "\\u003c")
+        dagre_source = self._read_browser_asset(DAGRE_VENDOR_PATH)
+        renderer_source = self._read_browser_asset(DAGRE_RENDERER_PATH)
 
         return f"""<!doctype html>
 <html lang="{escape(prism.meta.language.value)}">
@@ -73,15 +106,18 @@ class MermaidRenderer(Renderer):
       color: {theme.text_primary};
       background: {theme.background};
       min-height: 100vh;
-      overflow: hidden;
-      display: grid;
-      place-items: center;
+      overflow-x: hidden;
+      overflow-y: auto;
     }}
     main {{
-      padding: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: start center;
+      box-sizing: border-box;
+      padding: 24px 0;
     }}
     .diagram {{
-      width: min(900px, 100vw);
+      width: min({self.layout_config.canvas_width}px, 100vw);
       background: {theme.surface};
     }}
     .prism-svg {{
@@ -94,11 +130,25 @@ class MermaidRenderer(Renderer):
 </head>
 <body>
   <main>
-    <section class="diagram">{diagram_svg}</section>
+    <section id="prism-root" class="diagram" data-layout-engine="dagre"></section>
   </main>
+  <script>{dagre_source}</script>
+  <script>{renderer_source}</script>
+  <script id="prism-payload" type="application/json">{payload_json}</script>
+  <script>
+    PrismDagre.render(
+      JSON.parse(document.getElementById("prism-payload").textContent),
+      document.getElementById("prism-root")
+    );
+  </script>
 </body>
 </html>
 """
+
+    def _read_browser_asset(self, path: Path) -> str:
+        if not path.exists():
+            raise RenderError(f"Missing bundled browser asset: {path}")
+        return path.read_text(encoding="utf-8")
 
     def to_svg(
         self, prism: PrismDoc, ontology: Ontology, theme: VisualTheme | None = None
@@ -144,16 +194,16 @@ class MermaidRenderer(Renderer):
         return f"""<svg class="prism-svg" role="img" aria-label="{escape(prism.meta.title)}" width="{width}" height="{height}" viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="grad_neutral" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#2a2018" />
-      <stop offset="100%" stop-color="#1c1612" />
+      <stop offset="0%" stop-color="{theme.surface}" />
+      <stop offset="100%" stop-color="{theme.background}" />
     </linearGradient>
     <linearGradient id="grad_positive" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#e07b5a" />
-      <stop offset="100%" stop-color="#c4613d" />
+      <stop offset="0%" stop-color="{theme.accent_result}" />
+      <stop offset="100%" stop-color="{theme.accent_result}" stop-opacity="0.82" />
     </linearGradient>
     <linearGradient id="grad_highlight" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#e07b5a" />
-      <stop offset="100%" stop-color="#c4613d" />
+      <stop offset="0%" stop-color="{theme.accent_result}" />
+      <stop offset="100%" stop-color="{theme.accent_result}" stop-opacity="0.82" />
     </linearGradient>
     <linearGradient id="grad_bar_primary" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="{theme.accent_primary}" />
@@ -327,7 +377,7 @@ class MermaidRenderer(Renderer):
             parts.append(
                 f'<path d="{path}" data-edge-type="{escape(edge.type)}" fill="none" '
                 f'stroke="{color}" stroke-width="{visual["stroke_width"]}"{dash}{marker} '
-                f'opacity="0.86" />{label}'
+                f'opacity="{self.layout_config.edge_opacity:g}" />{label}'
             )
         return "".join(parts)
 
@@ -629,12 +679,12 @@ class MermaidRenderer(Renderer):
         layers = self._topological_layers(prism)
         width = 900
         height = 1200
-        margin_x = 40
+        margin_x = self.layout_config.node_route_clearance
         top = 36
         bottom = 156
         node_height = 66
         max_per_row = 3
-        x_gap = 20
+        x_gap = self.layout_config.node_column_gap
         y_gap = 20
 
         layer_heights = []
@@ -1033,10 +1083,19 @@ class MermaidRenderer(Renderer):
         ontology: Ontology,
         theme: VisualTheme,
     ) -> str:
-        parts = []
-        edge_offsets = self._edge_fan_offsets(prism.edges, positions)
-        row_tops = sorted({box[1] for box in positions.values()})
-        for edge_index, edge in enumerate(prism.edges):
+        path_parts = []
+        label_parts = []
+        visible_edges = [
+            edge
+            for edge in prism.edges
+            if not (
+                prism.render.show_loops
+                and self._edge_represented_by_loop(edge, prism)
+            )
+        ]
+        routes = self._plan_edge_routes(visible_edges, positions)
+        occupied_labels: list[tuple[float, float, float, float]] = []
+        for edge_index, edge in enumerate(visible_edges):
             if edge.from_ not in positions or edge.to not in positions:
                 continue
             x1, y1, w1, h1 = positions[edge.from_]
@@ -1044,13 +1103,7 @@ class MermaidRenderer(Renderer):
             color = theme.accent_primary
             visual = ontology.edge_visual(edge.type)
 
-            points = self._edge_route_points(
-                edge,
-                edge_index,
-                positions,
-                row_tops,
-                edge_offsets.get(edge_index, (0.0, 0.0)),
-            )
+            points = routes[edge_index]
             start_x, start_y = points[0]
             end_x, end_y = points[-1]
             if not self._source_endpoint_inside_node(edge, (start_x, start_y), positions):
@@ -1071,14 +1124,62 @@ class MermaidRenderer(Renderer):
                 x2 + w2 / 2,
                 y2 + h1 / 2,
                 theme,
+                route_points=points,
+                positions=positions,
+                occupied_labels=occupied_labels,
             )
 
-            parts.append(
+            path_parts.append(
                 f'<path d="{path}" data-edge-type="{escape(edge.type)}" fill="none" '
                 f'stroke="{color}" stroke-width="{visual["stroke_width"]}"{dash}{marker} '
-                f'opacity="0.86" />{label}'
+                f'opacity="{self.layout_config.edge_opacity:g}" />'
             )
-        return "".join(parts)
+            label_parts.append(label)
+        return "".join(path_parts + label_parts)
+
+    def _edge_represented_by_loop(self, edge: Edge, prism: PrismDoc) -> bool:
+        """Avoid drawing a feedback relation twice when the loop panel shows it."""
+
+        if edge.type != "feedback" and edge.direction != EdgeDirection.BACKWARD:
+            return False
+        for loop in prism.loops:
+            if len(loop.nodes) < 2:
+                continue
+            adjacent_pairs = zip(loop.nodes, loop.nodes[1:] + loop.nodes[:1])
+            if any(
+                {edge.from_, edge.to} == {source, target}
+                for source, target in adjacent_pairs
+            ):
+                return True
+        return False
+
+    def _plan_edge_routes(
+        self,
+        edges: list[Edge],
+        positions: dict[str, tuple[float, float, float, float]],
+    ) -> dict[int, list[tuple[float, float]]]:
+        """Plan ports and tracks for the whole layered graph before drawing."""
+
+        row_tops = sorted({box[1] for box in positions.values()})
+        fan_offsets = self._edge_fan_offsets(edges, positions)
+        gutter_offsets = self._edge_gutter_offsets(edges, positions, row_tops)
+        margin_tracks = self._edge_margin_tracks(edges, positions, row_tops)
+        center_tracks = self._edge_center_tracks(edges, positions, row_tops)
+        routes: dict[int, list[tuple[float, float]]] = {}
+        for edge_index, edge in enumerate(edges):
+            if edge.from_ not in positions or edge.to not in positions:
+                continue
+            routes[edge_index] = self._edge_route_points(
+                edge,
+                edge_index,
+                positions,
+                row_tops,
+                fan_offsets.get(edge_index, (0.0, 0.0)),
+                margin_x=margin_tracks.get(edge_index),
+                gutter_offsets=gutter_offsets.get(edge_index, (0.0, 0.0)),
+                center_route_x=center_tracks.get(edge_index),
+            )
+        return routes
 
     def _source_endpoint_inside_node(
         self,
@@ -1113,24 +1214,55 @@ class MermaidRenderer(Renderer):
             source_keys.append((edge.from_, source_side))
             target_keys.append((edge.to, target_side))
 
-        source_counts = Counter(key for key in source_keys if key is not None)
-        target_counts = Counter(key for key in target_keys if key is not None)
-        source_seen: Counter[tuple[str, str]] = Counter()
-        target_seen: Counter[tuple[str, str]] = Counter()
-        offsets: dict[int, tuple[float, float]] = {}
-
+        source_groups: dict[tuple[str, str], list[int]] = {}
+        target_groups: dict[tuple[str, str], list[int]] = {}
         for index, (source_key, target_key) in enumerate(zip(source_keys, target_keys)):
-            if source_key is None or target_key is None:
-                continue
-            source_index = source_seen[source_key]
-            target_index = target_seen[target_key]
-            source_seen[source_key] += 1
-            target_seen[target_key] += 1
-            source_offset = (source_index - (source_counts[source_key] - 1) / 2) * 12
-            target_offset = (target_index - (target_counts[target_key] - 1) / 2) * 12
-            offsets[index] = (source_offset, target_offset)
+            if source_key is not None:
+                source_groups.setdefault(source_key, []).append(index)
+            if target_key is not None:
+                target_groups.setdefault(target_key, []).append(index)
 
-        return offsets
+        source_offsets: dict[int, float] = {}
+        target_offsets: dict[int, float] = {}
+        for indexes in source_groups.values():
+            indexes.sort(
+                key=lambda index: (
+                    positions[edges[index].to][0] + positions[edges[index].to][2] / 2,
+                    positions[edges[index].to][1],
+                    edges[index].to,
+                )
+            )
+            source_id = edges[indexes[0]].from_
+            usable_width = max(0.0, positions[source_id][2] - 32)
+            gap = min(
+                self.layout_config.edge_port_gap,
+                usable_width / max(1, len(indexes) - 1),
+            )
+            for order, index in enumerate(indexes):
+                source_offsets[index] = (order - (len(indexes) - 1) / 2) * gap
+        for indexes in target_groups.values():
+            indexes.sort(
+                key=lambda index: (
+                    positions[edges[index].from_][0]
+                    + positions[edges[index].from_][2] / 2,
+                    positions[edges[index].from_][1],
+                    edges[index].from_,
+                )
+            )
+            target_id = edges[indexes[0]].to
+            usable_width = max(0.0, positions[target_id][2] - 32)
+            gap = min(
+                self.layout_config.edge_port_gap,
+                usable_width / max(1, len(indexes) - 1),
+            )
+            for order, index in enumerate(indexes):
+                target_offsets[index] = (order - (len(indexes) - 1) / 2) * gap
+
+        return {
+            index: (source_offsets.get(index, 0.0), target_offsets.get(index, 0.0))
+            for index in range(len(edges))
+            if source_keys[index] is not None and target_keys[index] is not None
+        }
 
     def _edge_sides(
         self,
@@ -1143,6 +1275,324 @@ class MermaidRenderer(Renderer):
             return "top", "bottom"
         return "bottom", "top"
 
+    def _edge_direction_and_rows(
+        self,
+        edge: Edge,
+        positions: dict[str, tuple[float, float, float, float]],
+        row_tops: list[float],
+    ) -> tuple[int, int, int]:
+        source_row = row_tops.index(positions[edge.from_][1])
+        target_row = row_tops.index(positions[edge.to][1])
+        direction = 1 if target_row >= source_row else -1
+        if edge.direction == EdgeDirection.BACKWARD:
+            direction = -1
+        return source_row, target_row, direction
+
+    def _edge_uses_margin(
+        self,
+        edge: Edge,
+        positions: dict[str, tuple[float, float, float, float]],
+        row_tops: list[float],
+    ) -> bool:
+        source_row, target_row, _direction = self._edge_direction_and_rows(
+            edge, positions, row_tops
+        )
+        row_distance = abs(target_row - source_row)
+        return (
+            row_distance > 2
+            or edge.type in {"influence", "risk", "feedback"}
+            or edge.direction == EdgeDirection.BACKWARD
+        )
+
+    def _edge_gutter_offsets(
+        self,
+        edges: list[Edge],
+        positions: dict[str, tuple[float, float, float, float]],
+        row_tops: list[float],
+    ) -> dict[int, tuple[float, float]]:
+        """Allocate independent horizontal tracks inside each row gap."""
+
+        endpoint_gaps: dict[tuple[int, str], int] = {}
+        gap_members: dict[int, list[tuple[int, str]]] = {}
+        for index, edge in enumerate(edges):
+            if edge.from_ not in positions or edge.to not in positions:
+                continue
+            source_row, target_row, direction = self._edge_direction_and_rows(
+                edge, positions, row_tops
+            )
+            source_gap = source_row if direction >= 0 else source_row - 1
+            target_gap = target_row - 1 if direction >= 0 else target_row
+            endpoint_gaps[(index, "source")] = source_gap
+            endpoint_gaps[(index, "target")] = target_gap
+            gap_members.setdefault(source_gap, []).append((index, "source"))
+            if target_gap != source_gap:
+                gap_members.setdefault(target_gap, []).append((index, "target"))
+
+        endpoint_offsets: dict[tuple[int, str], float] = {}
+        for gap, members in gap_members.items():
+            unique_indexes = sorted(
+                {index for index, _endpoint in members},
+                key=lambda index: (
+                    positions[edges[index].from_][0]
+                    + positions[edges[index].from_][2] / 2,
+                    positions[edges[index].to][0] + positions[edges[index].to][2] / 2,
+                    edges[index].from_,
+                    edges[index].to,
+                ),
+            )
+            track_gap = self.layout_config.edge_track_gap
+            if 0 <= gap < len(row_tops) - 1 and len(unique_indexes) > 1:
+                upper_bottom = max(
+                    y + height
+                    for _x, y, _width, height in positions.values()
+                    if y == row_tops[gap]
+                )
+                free_height = max(0.0, row_tops[gap + 1] - upper_bottom - 12)
+                track_gap = min(
+                    track_gap,
+                    free_height / max(1, len(unique_indexes) - 1),
+                )
+            for order, index in enumerate(unique_indexes):
+                offset = (order - (len(unique_indexes) - 1) / 2) * track_gap
+                for endpoint in ("source", "target"):
+                    if endpoint_gaps.get((index, endpoint)) == gap:
+                        endpoint_offsets[(index, endpoint)] = offset
+
+        offsets: dict[int, tuple[float, float]] = {}
+        for index in range(len(edges)):
+            source_offset = endpoint_offsets.get((index, "source"), 0.0)
+            target_offset = endpoint_offsets.get((index, "target"), source_offset)
+            edge = edges[index]
+            if (
+                endpoint_gaps.get((index, "source"))
+                == endpoint_gaps.get((index, "target"))
+                and (
+                    edge.type == "feedback"
+                    or edge.direction == EdgeDirection.BACKWARD
+                )
+            ):
+                half_gap = self.layout_config.edge_track_gap / 2
+                source_offset += half_gap
+                target_offset -= half_gap
+            offsets[index] = (source_offset, target_offset)
+        return offsets
+
+    def _edge_margin_tracks(
+        self,
+        edges: list[Edge],
+        positions: dict[str, tuple[float, float, float, float]],
+        row_tops: list[float],
+    ) -> dict[int, float]:
+        """Assign distinct side rails to long, risk, and feedback edges."""
+
+        side_members: dict[str, list[int]] = {"left": [], "right": []}
+        side_load = Counter({"left": 0, "right": 0})
+        for index, edge in enumerate(edges):
+            if (
+                edge.from_ not in positions
+                or edge.to not in positions
+                or not self._edge_uses_margin(edge, positions, row_tops)
+            ):
+                continue
+            start_center = positions[edge.from_][0] + positions[edge.from_][2] / 2
+            end_center = positions[edge.to][0] + positions[edge.to][2] / 2
+            if (
+                edge.type in {"influence", "risk", "feedback"}
+                or edge.direction == EdgeDirection.BACKWARD
+            ):
+                side = "right"
+            elif end_center < start_center:
+                side = "left"
+            elif end_center > start_center:
+                side = "right"
+            else:
+                side = "left" if side_load["left"] <= side_load["right"] else "right"
+            side_members[side].append(index)
+            side_load[side] += 1
+
+        tracks: dict[int, float] = {}
+        config = self.layout_config
+        for side, indexes in side_members.items():
+            indexes.sort(
+                key=lambda index: (
+                    0
+                    if edges[index].type == "feedback"
+                    or edges[index].direction == EdgeDirection.BACKWARD
+                    else 1,
+                    index,
+                )
+            )
+            if side == "left":
+                candidates = list(
+                    range(
+                        config.edge_route_margin,
+                        config.edge_outer_margin - 1,
+                        -config.edge_track_gap,
+                    )
+                )
+                candidates.extend(
+                    range(
+                        config.edge_route_margin + config.edge_track_gap,
+                        config.node_route_clearance,
+                        config.edge_track_gap,
+                    )
+                )
+            else:
+                candidates = list(
+                    range(
+                        config.canvas_width - config.edge_route_margin,
+                        config.canvas_width - config.edge_outer_margin + 1,
+                        config.edge_track_gap,
+                    )
+                )
+                candidates.extend(
+                    range(
+                        config.canvas_width - config.edge_route_margin - config.edge_track_gap,
+                        config.canvas_width - config.node_route_clearance,
+                        -config.edge_track_gap,
+                    )
+                )
+            available = list(candidates)
+            for index in indexes:
+                edge = edges[index]
+                is_feedback = (
+                    edge.type == "feedback"
+                    or edge.direction == EdgeDirection.BACKWARD
+                )
+                if not available:
+                    tracks[index] = float(candidates[-1])
+                    continue
+                if is_feedback:
+                    chosen = min(available) if side == "left" else max(available)
+                else:
+                    preferred = (
+                        config.edge_route_margin
+                        if side == "left"
+                        else config.canvas_width - config.edge_route_margin
+                    )
+                    chosen = min(available, key=lambda candidate: abs(candidate - preferred))
+                available.remove(chosen)
+                tracks[index] = float(chosen)
+        return tracks
+
+    def _edge_center_tracks(
+        self,
+        edges: list[Edge],
+        positions: dict[str, tuple[float, float, float, float]],
+        row_tops: list[float],
+    ) -> dict[int, float]:
+        """Allocate distinct vertical tracks for multi-row non-margin edges."""
+
+        groups: dict[tuple[int, int], list[int]] = {}
+        for index, edge in enumerate(edges):
+            if edge.from_ not in positions or edge.to not in positions:
+                continue
+            source_row, target_row, _direction = self._edge_direction_and_rows(
+                edge, positions, row_tops
+            )
+            if (
+                abs(target_row - source_row) <= 1
+                or self._edge_uses_margin(edge, positions, row_tops)
+            ):
+                continue
+            groups.setdefault(
+                (min(source_row, target_row), max(source_row, target_row)), []
+            ).append(index)
+
+        tracks: dict[int, float] = {}
+        occupied: list[tuple[float, int, int]] = []
+        gap = self.layout_config.edge_track_gap
+        for (lower_row, upper_row), indexes in sorted(
+            groups.items(), key=lambda item: (-(item[0][1] - item[0][0]), item[0])
+        ):
+            indexes.sort(
+                key=lambda index: (
+                    positions[edges[index].from_][0]
+                    + positions[edges[index].from_][2] / 2,
+                    positions[edges[index].to][0] + positions[edges[index].to][2] / 2,
+                    edges[index].from_,
+                )
+            )
+            first = edges[indexes[0]]
+            first_start = positions[first.from_][0] + positions[first.from_][2] / 2
+            first_end = positions[first.to][0] + positions[first.to][2] / 2
+            preferred = self._safe_center_route_x(
+                positions,
+                row_tops,
+                lower_row,
+                upper_row,
+                first_start,
+                first_end,
+            )
+            desired_tracks = [
+                preferred + (order - (len(indexes) - 1) / 2) * gap
+                for order in range(len(indexes))
+            ]
+            candidates = sorted(
+                {
+                    float(x)
+                    for x in range(
+                        self.layout_config.node_route_clearance,
+                        self.layout_config.canvas_width
+                        - self.layout_config.node_route_clearance
+                        + 1,
+                        max(4, gap // 2),
+                    )
+                },
+                key=lambda x: abs(x - preferred),
+            )
+            for index, desired in zip(indexes, desired_tracks):
+                ordered_candidates = [desired] + [
+                    candidate
+                    for candidate in candidates
+                    if abs(candidate - desired) > 0.1
+                ]
+                chosen = next(
+                    (
+                        candidate
+                        for candidate in ordered_candidates
+                        if self._center_track_is_clear(
+                            candidate,
+                            lower_row,
+                            upper_row,
+                            positions,
+                            row_tops,
+                            occupied,
+                        )
+                    ),
+                    preferred,
+                )
+                tracks[index] = chosen
+                occupied.append((chosen, lower_row, upper_row))
+        return tracks
+
+    def _center_track_is_clear(
+        self,
+        candidate: float,
+        lower_row: int,
+        upper_row: int,
+        positions: dict[str, tuple[float, float, float, float]],
+        row_tops: list[float],
+        occupied: list[tuple[float, int, int]],
+    ) -> bool:
+        clearance = 8
+        blockers = [
+            box
+            for box in positions.values()
+            if lower_row < row_tops.index(box[1]) < upper_row
+        ]
+        if any(
+            x - clearance <= candidate <= x + width + clearance
+            for x, _y, width, _height in blockers
+        ):
+            return False
+        return all(
+            upper_row <= used_lower
+            or lower_row >= used_upper
+            or abs(candidate - used_x) >= self.layout_config.edge_track_gap
+            for used_x, used_lower, used_upper in occupied
+        )
+
     def _edge_route_points(
         self,
         edge: Edge,
@@ -1150,6 +1600,10 @@ class MermaidRenderer(Renderer):
         positions: dict[str, tuple[float, float, float, float]],
         row_tops: list[float],
         fan_offsets: tuple[float, float],
+        *,
+        margin_x: float | None = None,
+        gutter_offsets: tuple[float, float] = (0.0, 0.0),
+        center_route_x: float | None = None,
     ) -> list[tuple[float, float]]:
         x1, y1, w1, h1 = positions[edge.from_]
         x2, y2, w2, h2 = positions[edge.to]
@@ -1168,15 +1622,25 @@ class MermaidRenderer(Renderer):
             start = (x1 + w1 / 2 + source_offset, y1)
             end = (x2 + w2 / 2 + target_offset, y2 + h2)
 
-        source_gutter = self._edge_gutter_y(row_tops, positions, source_row, direction)
-        target_gutter = self._edge_gutter_y(row_tops, positions, target_row, -direction)
+        source_gutter = (
+            self._edge_gutter_y(row_tops, positions, source_row, direction)
+            + gutter_offsets[0]
+        )
+        target_gutter = (
+            self._edge_gutter_y(row_tops, positions, target_row, -direction)
+            + gutter_offsets[1]
+        )
         row_distance = abs(row_delta)
         use_margin = row_distance > 2 or edge.type in {"influence", "risk"}
         if edge.type == "feedback" or edge.direction == EdgeDirection.BACKWARD:
             use_margin = use_margin or row_distance > 0
 
         if use_margin:
-            route_x = self._edge_margin_x(edge, edge_index, start[0], end[0])
+            route_x = (
+                margin_x
+                if margin_x is not None
+                else self._edge_margin_x(edge, edge_index, start[0], end[0])
+            )
             return [
                 start,
                 (start[0], source_gutter),
@@ -1186,8 +1650,12 @@ class MermaidRenderer(Renderer):
                 end,
             ]
 
-        route_x = self._safe_center_route_x(
-            positions, row_tops, source_row, target_row, start[0], end[0]
+        route_x = (
+            center_route_x
+            if center_route_x is not None
+            else self._safe_center_route_x(
+                positions, row_tops, source_row, target_row, start[0], end[0]
+            )
         )
         if row_distance <= 1:
             shared_gutter = source_gutter
@@ -1270,6 +1738,10 @@ class MermaidRenderer(Renderer):
         target_center_x: float,
         target_center_y: float,
         theme: VisualTheme,
+        *,
+        route_points: list[tuple[float, float]] | None = None,
+        positions: dict[str, tuple[float, float, float, float]] | None = None,
+        occupied_labels: list[tuple[float, float, float, float]] | None = None,
     ) -> str:
         if not text:
             return ""
@@ -1285,11 +1757,26 @@ class MermaidRenderer(Renderer):
         label_y = (start_y + end_y) / 2 - 8
         text_anchor = "end" if raw_label_x > 600 else "middle"
 
-        if text_anchor == "end":
+        collision_aware = route_points is not None and positions is not None
+        label_box: tuple[float, float, float, float] | None = None
+        if collision_aware:
+            placement = self._edge_label_placement(
+                route_points,
+                estimated_width,
+                font_size,
+                positions,
+                occupied_labels or [],
+            )
+            if placement is not None:
+                label_x, label_y, text_anchor, label_box = placement
+            else:
+                collision_aware = False
+
+        if not collision_aware and text_anchor == "end":
             label_x = min(raw_label_x, max_x)
             if label_x - estimated_width < min_x:
                 label_x = min(max_x, min_x + estimated_width)
-        else:
+        elif not collision_aware:
             raw_label_x = (source_center_x + target_center_x) / 2
             half_width = estimated_width / 2
             if raw_label_x - half_width < min_x or raw_label_x + half_width > max_x:
@@ -1300,10 +1787,113 @@ class MermaidRenderer(Renderer):
             elif label_x - half_width < min_x:
                 label_x = min_x + half_width
 
+        if label_box is None:
+            label_box = self._edge_label_box(
+                label_x, label_y, estimated_width, font_size, text_anchor
+            )
+        if occupied_labels is not None:
+            occupied_labels.append(label_box)
+
+        rect_x, rect_top, rect_right, rect_bottom = label_box
+        background = (
+            f'<rect x="{rect_x:.1f}" y="{rect_top:.1f}" '
+            f'width="{rect_right - rect_x:.1f}" height="{rect_bottom - rect_top:.1f}" '
+            f'rx="2" fill="{theme.background}" opacity="0.92" />'
+            if collision_aware
+            else ""
+        )
+
         return (
-            f'<text x="{label_x:.1f}" y="{label_y:.1f}" text-anchor="{text_anchor}" '
+            f'{background}<text x="{label_x:.1f}" y="{label_y:.1f}" text-anchor="{text_anchor}" '
             f'fill="{theme.text_secondary}" font-size="{font_size}" opacity="{self.layout_config.edge_label_opacity:g}" '
             f'font-family="ui-sans-serif, system-ui">{escape(label_text)}</text>'
+        )
+
+    def _edge_label_placement(
+        self,
+        points: list[tuple[float, float]],
+        text_width: float,
+        font_size: int,
+        positions: dict[str, tuple[float, float, float, float]],
+        occupied_labels: list[tuple[float, float, float, float]],
+    ) -> tuple[float, float, str, tuple[float, float, float, float]] | None:
+        candidates = []
+        for start, end in zip(points, points[1:]):
+            if abs(start[1] - end[1]) > 0.1:
+                continue
+            length = abs(end[0] - start[0])
+            if length < text_width + 12:
+                continue
+            candidates.append((length, (start[0] + end[0]) / 2, start[1] - 8))
+
+        for _length, raw_x, label_y in sorted(candidates, reverse=True):
+            half_width = text_width / 2
+            label_x = self._clamp(raw_x, 24 + half_width, 888 - half_width)
+            box = self._edge_label_box(label_x, label_y, text_width, font_size, "middle")
+            if self._box_overlaps_any(box, positions.values(), padding=4):
+                continue
+            if any(self._bounds_overlap(box, occupied, padding=4) for occupied in occupied_labels):
+                continue
+            return label_x, label_y, "middle", box
+        return None
+
+    def _edge_label_box(
+        self,
+        label_x: float,
+        label_y: float,
+        text_width: float,
+        font_size: int,
+        text_anchor: str,
+    ) -> tuple[float, float, float, float]:
+        if text_anchor == "end":
+            left = label_x - text_width
+            right = label_x
+        else:
+            left = label_x - text_width / 2
+            right = label_x + text_width / 2
+        return left - 4, label_y - font_size - 2, right + 4, label_y + 3
+
+    def _box_overlaps_any(
+        self,
+        box: tuple[float, float, float, float],
+        others: Iterable[tuple[float, float, float, float]],
+        *,
+        padding: float,
+    ) -> bool:
+        return any(self._boxes_overlap(box, other, padding=padding) for other in others)
+
+    def _boxes_overlap(
+        self,
+        first: tuple[float, float, float, float],
+        second: tuple[float, float, float, float],
+        *,
+        padding: float,
+    ) -> bool:
+        first_left, first_top, first_right, first_bottom = first
+        second_x, second_y, second_width, second_height = second
+        second_left = second_x - padding
+        second_top = second_y - padding
+        second_right = second_x + second_width + padding
+        second_bottom = second_y + second_height + padding
+        return (
+            first_left < second_right
+            and first_right > second_left
+            and first_top < second_bottom
+            and first_bottom > second_top
+        )
+
+    def _bounds_overlap(
+        self,
+        first: tuple[float, float, float, float],
+        second: tuple[float, float, float, float],
+        *,
+        padding: float,
+    ) -> bool:
+        return (
+            first[0] < second[2] + padding
+            and first[2] > second[0] - padding
+            and first[1] < second[3] + padding
+            and first[3] > second[1] - padding
         )
 
     def _clamp(self, value: float, lower: float, upper: float) -> float:
@@ -1320,7 +1910,11 @@ class MermaidRenderer(Renderer):
         visual = ontology.role_visual(node.role)
         fill, border = self._status_colors(node, theme)
         status = node.status.value
-        text_color = theme.text_primary
+        text_color = (
+            theme.background
+            if status in {"positive", "highlight"}
+            else theme.text_primary
+        )
         border_width = float(visual["border_width"])
         radius = float(visual["radius"])
         border_dash = visual.get("border_dash") if node.role == "risk" else None
@@ -1379,8 +1973,15 @@ class MermaidRenderer(Renderer):
                 f'width="{theme.node_accent_bar_width}" height="{height:.1f}" rx="1" '
                 f'fill="url(#{bar_gradient})" />'
             )
+        icon_color = text_color if status in {"positive", "highlight"} else border
         icon = self._render_svg_icon(
-            node.role, x, y, height, border, bool(visual["accent_bar"]), theme
+            node.role,
+            x,
+            y,
+            height,
+            icon_color,
+            bool(visual["accent_bar"]),
+            theme,
         )
         return (
             f'<g class="node" data-node-id="{escape(node.id)}" '
