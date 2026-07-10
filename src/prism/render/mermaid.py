@@ -13,6 +13,7 @@ import re
 from prism.core.models import Ontology
 from prism.core.schema import Edge, EdgeDirection, Node, PrismDoc, RenderLane
 from prism.core.validator import validate_prism_doc
+from prism.ontologies.loader import load_ontology
 from prism.render.base import Renderer
 from prism.render.theme import VisualTheme, load_theme
 
@@ -102,7 +103,7 @@ class MermaidRenderer(Renderer):
         theme = theme or load_theme(prism.meta.visual_theme)
         config = self.layout_config
         layout = (
-            self._layout_parallel_lanes(prism)
+            self._layout_parallel_lanes(prism, ontology)
             if prism.render.template == "parallel_lanes"
             else self._layout_nodes(prism, ontology)
         )
@@ -110,11 +111,10 @@ class MermaidRenderer(Renderer):
         height = layout["height"]
         positions: dict[str, tuple[float, float, float, float]] = layout["positions"]  # type: ignore[assignment]
         node_by_id = {node.id: node for node in prism.nodes}
-        emphasized_nodes = self._emphasized_nodes(prism)
         edge_svg = (
-            self._render_parallel_lanes_edges(prism, positions, layout, theme)
+            self._render_parallel_lanes_edges(prism, positions, layout, theme, ontology)
             if prism.render.template == "parallel_lanes"
-            else self._render_svg_edges(prism, positions, theme)
+            else self._render_svg_edges(prism, positions, ontology, theme)
         )
         # Diagnostic finding from `prism render examples/stablecoin-interest-parallel-lanes.yaml`:
         # entry_node_top_y=32, canvas_height=784, max_content_bottom_y=712, bottom_margin=72.
@@ -132,21 +132,20 @@ class MermaidRenderer(Renderer):
                 positions[node_id],
                 ontology,
                 theme,
-                node_id in emphasized_nodes,
             )
             for node_id in layout["order"]  # type: ignore[index]
         )
 
         return f"""<svg class="prism-svg" role="img" aria-label="{escape(prism.meta.title)}" width="{width}" height="{height}" viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <marker id="arrow-primary" markerWidth="{config.arrowhead_size}" markerHeight="{config.arrowhead_size}" refX="{config.arrowhead_size}" refY="{config.arrowhead_size / 2:.1f}" orient="auto" markerUnits="strokeWidth">
-      <path d="M 0 0 L {config.arrowhead_size} {config.arrowhead_size / 2:.1f} L 0 {config.arrowhead_size} z" fill="{theme.accent_primary}" />
+    <marker id="arrow-filled_triangle" markerWidth="{config.arrowhead_size}" markerHeight="{config.arrowhead_size}" refX="{config.arrowhead_size}" refY="{config.arrowhead_size / 2:.1f}" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L {config.arrowhead_size} {config.arrowhead_size / 2:.1f} L 0 {config.arrowhead_size} z" fill="context-stroke" />
     </marker>
-    <marker id="arrow-secondary" markerWidth="{config.arrowhead_size}" markerHeight="{config.arrowhead_size}" refX="{config.arrowhead_size}" refY="{config.arrowhead_size / 2:.1f}" orient="auto" markerUnits="strokeWidth">
-      <path d="M 0 0 L {config.arrowhead_size} {config.arrowhead_size / 2:.1f} L 0 {config.arrowhead_size} z" fill="{theme.accent_secondary}" />
+    <marker id="arrow-filled_triangle_large" markerWidth="{config.arrowhead_size * 1.4:.1f}" markerHeight="{config.arrowhead_size * 1.4:.1f}" refX="{config.arrowhead_size * 1.4:.1f}" refY="{config.arrowhead_size * 0.7:.1f}" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L {config.arrowhead_size * 1.4:.1f} {config.arrowhead_size * 0.7:.1f} L 0 {config.arrowhead_size * 1.4:.1f} z" fill="context-stroke" />
     </marker>
-    <marker id="arrow-risk" markerWidth="{config.arrowhead_size}" markerHeight="{config.arrowhead_size}" refX="{config.arrowhead_size}" refY="{config.arrowhead_size / 2:.1f}" orient="auto" markerUnits="strokeWidth">
-      <path d="M 0 0 L {config.arrowhead_size} {config.arrowhead_size / 2:.1f} L 0 {config.arrowhead_size} z" fill="{theme.accent_risk}" />
+    <marker id="arrow-open_triangle" markerWidth="{config.arrowhead_size}" markerHeight="{config.arrowhead_size}" refX="{config.arrowhead_size}" refY="{config.arrowhead_size / 2:.1f}" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L {config.arrowhead_size} {config.arrowhead_size / 2:.1f} L 0 {config.arrowhead_size}" fill="none" stroke="context-stroke" />
     </marker>
   </defs>
   <rect width="{width}" height="{height}" fill="{theme.background}" />
@@ -166,46 +165,56 @@ class MermaidRenderer(Renderer):
 
         theme = theme or load_theme(prism.meta.visual_theme)
         lines = [f"flowchart {prism.diagram.direction.value}"]
-        class_names: dict[str, str] = {}
+        class_names: dict[tuple[str, str], str] = {}
         class_counter = count(1)
 
         for node in prism.nodes:
             node_label = self._node_label(node.label, node.sublabel)
-            lines.append(f"    {node.id}[\"{node_label}\"]")
-            class_name = class_names.setdefault(node.role, f"role{next(class_counter)}")
+            visual = ontology.role_visual(node.role)
+            lines.append(self._mermaid_node(node, node_label, str(visual["shape"])))
+            class_key = (node.role, node.status.value)
+            class_name = class_names.setdefault(class_key, f"role{next(class_counter)}")
             lines.append(f"    class {node.id} {class_name}")
 
         for index, edge in enumerate(prism.edges):
-            arrow = self._arrow(edge.direction)
+            visual = ontology.edge_visual(edge.type)
+            arrow = "---" if visual["arrow"] == "none" else self._arrow(edge.direction)
             label = f"|{self._escape_mermaid(edge.label)}|" if edge.label else ""
             lines.append(f"    {edge.from_} {arrow}{label} {edge.to}")
-            style = ontology.edge_style(edge.type)
             edge_index = index
-            color = self._edge_color(edge.type, theme)
-            stroke_style = "stroke-dasharray: 5 5" if style.get("style") == "dashed" else ""
-            style_bits = [f"stroke:{color}"]
-            if stroke_style:
-                style_bits.append(stroke_style)
+            style_bits = [
+                f"stroke:{theme.accent_primary}",
+                f"stroke-width:{visual['stroke_width']}px",
+            ]
+            if visual.get("stroke_dash") is not None:
+                style_bits.append(f"stroke-dasharray:{visual['stroke_dash']}")
             lines.append(f"    linkStyle {edge_index} {','.join(style_bits)}")
 
-        for role, class_name in class_names.items():
+        for (role, status), class_name in class_names.items():
+            visual = ontology.role_visual(role)
+            node = next(node for node in prism.nodes if node.role == role and node.status.value == status)
+            fill, border = self._status_colors(node, theme)
+            dash = visual.get("border_dash")
+            if status == "negative" and not dash:
+                dash = ontology.role_visual("risk").get("border_dash")
+            dash_style = f",stroke-dasharray:{dash}" if dash is not None else ""
             lines.append(
-                f"    classDef {class_name} fill:{theme.surface},"
-                f"stroke:{theme.surface_border},stroke-width:1.5px,color:{theme.text_primary}"
+                f"    classDef {class_name} fill:{fill},stroke:{border},"
+                f"stroke-width:{visual['border_width']}px,color:{theme.text_primary}{dash_style}"
             )
 
         if prism.render.highlight_nodes:
             for node_id in prism.render.highlight_nodes:
-                lines.append(f"    style {node_id} stroke:{theme.accent_result},stroke-width:3px")
+                lines.append(f"    style {node_id} stroke:{theme.accent_result}")
 
         return "\n".join(lines)
 
-    def _edge_color(self, edge_type: str, theme: VisualTheme) -> str:
-        if edge_type == "feedback":
-            return theme.accent_risk
-        if edge_type in {"information", "authorization"}:
-            return theme.accent_secondary
-        return theme.accent_primary
+    def _mermaid_node(self, node: Node, label: str, shape: str) -> str:
+        if shape == "round":
+            return f'    {node.id}(["{label}"])'
+        if shape == "double_border":
+            return f'    {node.id}[["{label}"]]'
+        return f'    {node.id}["{label}"]'
 
     def _render_parallel_lane_guides(
         self, layout: dict[str, object], theme: VisualTheme
@@ -243,7 +252,9 @@ class MermaidRenderer(Renderer):
         positions: dict[str, tuple[float, float, float, float]],
         layout: dict[str, object],
         theme: VisualTheme,
+        ontology: Ontology | None = None,
     ) -> str:
+        ontology = ontology or load_ontology(prism.meta.ontology)
         lane_by_node = {node.id: node.lane for node in prism.nodes}
         node_ids = {node.id for node in prism.nodes}
         shared_entry = layout.get("shared_entry")
@@ -254,20 +265,19 @@ class MermaidRenderer(Renderer):
                 continue
             same_lane = lane_by_node.get(edge.from_) == lane_by_node.get(edge.to)
             if same_lane:
-                path, dash = self._parallel_lane_edge_path(edge, positions), ""
-                color = self._edge_color(edge.type, theme)
+                path = self._parallel_lane_edge_path(edge, positions)
+                color = theme.accent_primary
                 label_kind = "vertical"
             elif edge.from_ == shared_entry:
-                path, dash = self._parallel_entry_fan_path(edge, positions), ""
+                path = self._parallel_entry_fan_path(edge, positions)
                 color = theme.accent_secondary
                 label_kind = "fan"
             elif edge.to == shared_convergence:
-                path, dash = self._parallel_convergence_fan_path(edge, positions), ""
+                path = self._parallel_convergence_fan_path(edge, positions)
                 color = theme.accent_secondary
                 label_kind = "fan"
             else:
                 path = self._parallel_margin_edge_path(edge, positions, layout)
-                dash = ' stroke-dasharray="8 7"'
                 color = theme.accent_secondary
                 label_kind = "margin"
             endpoints = self._parallel_path_endpoints(path)
@@ -277,14 +287,14 @@ class MermaidRenderer(Renderer):
                 print(f"SKIPPED stray edge: {edge.from_} -> {edge.to}")
                 continue
 
-            marker = {
-                theme.accent_secondary: "arrow-secondary",
-                theme.accent_risk: "arrow-risk",
-            }.get(color, "arrow-primary")
+            visual = ontology.edge_visual(edge.type)
+            dash = self._stroke_dash_attribute(visual.get("stroke_dash"))
+            marker = self._marker_attribute(str(visual["arrow"]))
             label = self._parallel_edge_label(edge, positions, theme, label_kind)
             parts.append(
-                f'<path d="{path}" fill="none" stroke="{color}" stroke-width="1.5"{dash} '
-                f'marker-end="url(#{marker})" opacity="0.86" />{label}'
+                f'<path d="{path}" data-edge-type="{escape(edge.type)}" fill="none" '
+                f'stroke="{color}" stroke-width="{visual["stroke_width"]}"{dash}{marker} '
+                f'opacity="0.86" />{label}'
             )
         return "".join(parts)
 
@@ -625,13 +635,20 @@ class MermaidRenderer(Renderer):
                 y += layer_gap
 
         if ontology is not None:
+            node_by_id = {node.id: node for node in prism.nodes}
+            for node_id, box in list(positions.items()):
+                positions[node_id] = self._scale_layout_box(
+                    box, node_by_id[node_id], ontology
+                )
             self._ensure_min_horizontal_gap(
                 positions, order, prism, ontology, width, margin_x, x_gap
             )
 
         return {"width": width, "height": height, "positions": positions, "order": order}
 
-    def _layout_parallel_lanes(self, prism: PrismDoc) -> dict[str, object]:
+    def _layout_parallel_lanes(
+        self, prism: PrismDoc, ontology: Ontology | None = None
+    ) -> dict[str, object]:
         config = self.layout_config
         width = config.canvas_width
         margin_x = config.lane_padding
@@ -651,6 +668,7 @@ class MermaidRenderer(Renderer):
         lane_orders: dict[str, list[str]] = {}
         positions: dict[str, tuple[float, float, float, float]] = {}
         order: list[str] = []
+        node_by_id = {node.id: node for node in prism.nodes}
 
         lane_top = top + (
             node_height + config.fanout_curve_height if shared_entry else 0
@@ -667,6 +685,10 @@ class MermaidRenderer(Renderer):
             for row_index, node_id in enumerate(lane_order):
                 y = lane_top + row_index * (node_height + node_gap)
                 positions[node_id] = (x, y, node_width, node_height)
+                if ontology is not None:
+                    positions[node_id] = self._scale_layout_box(
+                        positions[node_id], node_by_id[node_id], ontology
+                    )
                 order.append(node_id)
 
         lane_bottom = max(
@@ -681,6 +703,10 @@ class MermaidRenderer(Renderer):
                 entry_width,
                 node_height,
             )
+            if ontology is not None:
+                positions[shared_entry] = self._scale_layout_box(
+                    positions[shared_entry], node_by_id[shared_entry], ontology
+                )
             order.insert(0, shared_entry)
         if shared_convergence:
             convergence_width = node_width
@@ -690,6 +716,12 @@ class MermaidRenderer(Renderer):
                 convergence_width,
                 node_height,
             )
+            if ontology is not None:
+                positions[shared_convergence] = self._scale_layout_box(
+                    positions[shared_convergence],
+                    node_by_id[shared_convergence],
+                    ontology,
+                )
             order.append(shared_convergence)
 
         max_content_bottom = max((y + h for _x, y, _w, h in positions.values()), default=lane_top)
@@ -872,12 +904,21 @@ class MermaidRenderer(Renderer):
         ontology: Ontology,
     ) -> tuple[float, float, float, float]:
         x, y, width, height = box
-        scale = min(1.0, float(ontology.weight_style(node.weight)["scale"]))
+        return x, y, x + width, y + height
+
+    def _scale_layout_box(
+        self,
+        box: tuple[float, float, float, float],
+        node: Node,
+        ontology: Ontology,
+    ) -> tuple[float, float, float, float]:
+        x, y, width, height = box
+        scale = float(ontology.role_visual(node.role).get("scale", 1.0))
         scaled_width = width * scale
         scaled_height = height * scale
         scaled_x = x + (width - scaled_width) / 2
         scaled_y = y + (height - scaled_height) / 2
-        return scaled_x, scaled_y, scaled_x + scaled_width, scaled_y + scaled_height
+        return scaled_x, scaled_y, scaled_width, scaled_height
 
     def _layer_node_width(
         self,
@@ -956,6 +997,7 @@ class MermaidRenderer(Renderer):
         self,
         prism: PrismDoc,
         positions: dict[str, tuple[float, float, float, float]],
+        ontology: Ontology,
         theme: VisualTheme,
     ) -> str:
         parts = []
@@ -966,11 +1008,8 @@ class MermaidRenderer(Renderer):
                 continue
             x1, y1, w1, h1 = positions[edge.from_]
             x2, y2, w2, _ = positions[edge.to]
-            color = self._edge_color(edge.type, theme)
-            marker = {
-                theme.accent_secondary: "arrow-secondary",
-                theme.accent_risk: "arrow-risk",
-            }.get(color, "arrow-primary")
+            color = theme.accent_primary
+            visual = ontology.edge_visual(edge.type)
 
             points = self._edge_route_points(
                 edge,
@@ -985,10 +1024,8 @@ class MermaidRenderer(Renderer):
                 print(f"SKIPPED stray edge: {edge.from_} -> {edge.to}")
                 continue
             path = self._polyline_path(points)
-            if edge.type in {"feedback", "influence", "risk"} or y2 <= y1:
-                dash = ' stroke-dasharray="8 7"'
-            else:
-                dash = ""
+            dash = self._stroke_dash_attribute(visual.get("stroke_dash"))
+            marker = self._marker_attribute(str(visual["arrow"]))
 
             label = self._render_edge_label(
                 edge.label,
@@ -1004,8 +1041,9 @@ class MermaidRenderer(Renderer):
             )
 
             parts.append(
-                f'<path d="{path}" fill="none" stroke="{color}" stroke-width="1.5"{dash} '
-                f'marker-end="url(#{marker})" opacity="0.86" />{label}'
+                f'<path d="{path}" data-edge-type="{escape(edge.type)}" fill="none" '
+                f'stroke="{color}" stroke-width="{visual["stroke_width"]}"{dash}{marker} '
+                f'opacity="0.86" />{label}'
             )
         return "".join(parts)
 
@@ -1243,49 +1281,81 @@ class MermaidRenderer(Renderer):
         box: tuple[float, float, float, float],
         ontology: Ontology,
         theme: VisualTheme,
-        emphasized: bool,
     ) -> str:
         x, y, width, height = box
-        weight_style = ontology.weight_style(node.weight)
-        scale = min(1.0, float(weight_style["scale"]))
-        fill = weight_style["fill"] if weight_style["fill"] != "none" else theme.background
-        text_color = weight_style["text"]
-        border = weight_style["border"]
-        scaled_width = width * scale
-        scaled_height = height * scale
-        scaled_x = x + (width - scaled_width) / 2
-        scaled_y = y + (height - scaled_height) / 2
-        title_lines = self._wrap_text(node.label, max(4, int(scaled_width / 18)), 2)
-        sublabel_lines = self._wrap_text(node.sublabel or "", max(6, int(scaled_width / 14)), 2)
-        title_y = scaled_y + 28 if len(title_lines) == 1 else scaled_y + 23
+        visual = ontology.role_visual(node.role)
+        fill, border = self._status_colors(node, theme)
+        text_color = theme.text_primary
+        border_width = float(visual["border_width"])
+        radius = float(visual["radius"])
+        border_dash = visual.get("border_dash")
+        if node.status.value == "negative" and not border_dash:
+            border_dash = ontology.role_visual("risk").get("border_dash")
+        dash = self._stroke_dash_attribute(border_dash)
+        title_lines = self._wrap_text(node.label, max(4, int(width / 18)), 2)
+        sublabel_lines = self._wrap_text(node.sublabel or "", max(6, int(width / 14)), 2)
+        title_y = y + 28 if len(title_lines) == 1 else y + 23
         text_parts = []
         for index, line in enumerate(title_lines):
             text_parts.append(
-                f'<text x="{scaled_x + 18:.1f}" y="{title_y + index * 18:.1f}" '
+                f'<text x="{x + 18:.1f}" y="{title_y + index * 18:.1f}" '
                 f'fill="{text_color}" font-size="15" font-weight="650" '
                 f'font-family="ui-sans-serif, system-ui">{escape(line)}</text>'
             )
-        sublabel_y = scaled_y + 51 if len(title_lines) == 1 else scaled_y + 56
+        sublabel_y = y + 51 if len(title_lines) == 1 else y + 56
         for index, line in enumerate(sublabel_lines[:1]):
             text_parts.append(
-                f'<text x="{scaled_x + 18:.1f}" y="{sublabel_y + index * 15:.1f}" '
+                f'<text x="{x + 18:.1f}" y="{sublabel_y + index * 15:.1f}" '
                 f'fill="{text_color}" font-size="13" opacity="0.78" '
                 f'font-family="ui-sans-serif, system-ui">{escape(line)}</text>'
             )
 
-        bar_width = theme.node_accent_bar_width + (2 if emphasized else 0)
-        stroke_width = 2 if emphasized else 1
+        shape_parts = [
+            f'<rect class="node-shape node-shape-outer" x="{x:.1f}" y="{y:.1f}" '
+            f'width="{width:.1f}" height="{height:.1f}" rx="{radius:g}" fill="{fill}" '
+            f'stroke="{border}" stroke-width="{border_width:g}"{dash} />'
+        ]
+        if visual["shape"] == "double_border":
+            inner_gap = 2.0
+            inner_border_width = border_width - 0.5
+            shape_parts.append(
+                f'<rect class="node-shape node-shape-inner" x="{x + inner_gap:.1f}" '
+                f'y="{y + inner_gap:.1f}" width="{width - inner_gap * 2:.1f}" '
+                f'height="{height - inner_gap * 2:.1f}" rx="{max(0.0, radius - inner_gap):g}" '
+                f'fill="none" stroke="{border}" stroke-width="{inner_border_width:g}"{dash} />'
+            )
+        accent_bar = ""
+        if bool(visual["accent_bar"]):
+            accent_bar = (
+                f'<rect class="prism-node-accent" x="{x:.1f}" y="{y:.1f}" '
+                f'width="{theme.node_accent_bar_width}" height="{height:.1f}" rx="1" '
+                f'fill="{border}" />'
+            )
         return (
-            f'<g class="node" data-node-id="{escape(node.id)}">'
-            f'<rect x="{scaled_x:.1f}" y="{scaled_y:.1f}" width="{scaled_width:.1f}" '
-            f'height="{scaled_height:.1f}" rx="8" fill="{fill}" stroke="{border}" '
-            f'stroke-width="{stroke_width}" />'
-            f'<rect class="prism-node-accent" x="{scaled_x:.1f}" y="{scaled_y:.1f}" '
-            f'width="{bar_width}" height="{scaled_height:.1f}" rx="1" '
-            f'fill="{border}" />'
+            f'<g class="node" data-node-id="{escape(node.id)}" '
+            f'data-role="{escape(node.role)}" data-status="{node.status.value}">'
+            f'{"".join(shape_parts)}'
+            f'{accent_bar}'
             f'{"".join(text_parts)}'
             "</g>"
         )
+
+    def _status_colors(self, node: Node, theme: VisualTheme) -> tuple[str, str]:
+        if node.status.value in {"positive", "highlight"}:
+            return theme.accent_result, theme.accent_result
+        if node.status.value == "negative":
+            return theme.surface, theme.accent_risk
+        return theme.surface, theme.accent_primary
+
+    def _stroke_dash_attribute(self, stroke_dash: object) -> str:
+        if stroke_dash is None:
+            return ""
+        return f' stroke-dasharray="{escape(str(stroke_dash))}"'
+
+    def _marker_attribute(self, arrow: str) -> str:
+        if arrow == "none":
+            return ""
+        return f' marker-end="url(#arrow-{escape(arrow)})"'
 
     def _render_svg_loops(self, prism: PrismDoc, theme: VisualTheme) -> str:
         if not prism.loops:
@@ -1329,21 +1399,6 @@ class MermaidRenderer(Renderer):
         segments = [f"M {start_x:.1f} {start_y:.1f}"]
         segments.extend(f"L {x:.1f} {y:.1f}" for x, y in points[1:])
         return " ".join(segments)
-
-    def _emphasized_nodes(self, prism: PrismDoc) -> set[str]:
-        node_ids = {node.id for node in prism.nodes}
-        incoming = {node_id: 0 for node_id in node_ids}
-        outgoing = {node_id: 0 for node_id in node_ids}
-        for edge in prism.edges:
-            if edge.type == "feedback" or edge.direction == EdgeDirection.BACKWARD:
-                continue
-            if edge.from_ in node_ids and edge.to in node_ids:
-                outgoing[edge.from_] += 1
-                incoming[edge.to] += 1
-
-        starts = {node_id for node_id in node_ids if incoming[node_id] == 0 and outgoing[node_id] > 0}
-        ends = {node_id for node_id in node_ids if outgoing[node_id] == 0 and incoming[node_id] > 0}
-        return starts | ends
 
     def _wrap_text(self, text: str, max_chars: int, max_lines: int) -> list[str]:
         if not text:
