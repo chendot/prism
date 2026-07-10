@@ -21,56 +21,67 @@ nodes:
   label: 稳定币用户
   sublabel: 交出法币流动性以获得链上支付资产
   role: buyer
+  status: neutral
   layer: 1
 - id: fiat_deposits
   label: 法币存款
   sublabel: 稳定币发行的资金来源
   role: asset
+  status: neutral
   layer: 2
 - id: stablecoin_issuer
   label: 稳定币发行方
   sublabel: 接收储备并发行稳定币
   role: issuer
+  status: neutral
   layer: 3
 - id: reserve_assets
   label: 储备资产
   sublabel: 国债、存款和货币基金等低风险资产
   role: asset
+  status: neutral
   layer: 4
 - id: interest_income
   label: 储备利息
   sublabel: 储备资产产生的收益
   role: asset
+  status: neutral
   layer: 5
 - id: stablecoin_tokens
   label: 稳定币
   sublabel: 链上美元记账和结算工具
   role: asset
+  status: neutral
   layer: 4
 - id: exchanges_wallets
   label: 交易所钱包
   sublabel: 分发稳定币并承接用户交易
   role: intermediary
+  status: neutral
   layer: 5
 - id: defi_markets
   label: DeFi 市场
   sublabel: 稳定币进入借贷、交易和抵押场景
   role: market
+  status: neutral
   layer: 6
 - id: banks
   label: 商业银行
   sublabel: 存款外流后失去部分低成本资金
   role: intermediary
+  status: neutral
   layer: 3
 - id: regulators
   label: 监管机构
   sublabel: 争夺储备透明度和收益归属规则
   role: regulator
+  status: neutral
   layer: 6
 - id: allocation_risk
   label: 分配风险
   sublabel: 用户承担信用和流动性风险却未必获得利息
   role: risk
+  status: negative
   layer: 7
 edges:
 - from: users

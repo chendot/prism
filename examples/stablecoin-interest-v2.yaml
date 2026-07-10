@@ -21,60 +21,70 @@ nodes:
   label: 用户
   sublabel: 用法币购买稳定币并承担持有机会成本
   role: buyer
+  status: neutral
   layer: 1
   weight: secondary
 - id: fiat_deposit
   label: 法币存款
   sublabel: 用户交出的现金或银行存款
   role: asset
+  status: neutral
   layer: 2
   weight: secondary
 - id: stablecoin_issuer
   label: 稳定币发行方
   sublabel: 接收法币并铸造稳定币
   role: issuer
+  status: neutral
   layer: 3
   weight: secondary
 - id: stablecoin
   label: 稳定币
   sublabel: 对外承诺接近一比一兑付的链上资产
   role: asset
+  status: neutral
   layer: 4
   weight: secondary
 - id: reserve_assets
   label: 储备资产
   sublabel: 国债、回购、银行存款等低风险资产
   role: asset
+  status: neutral
   layer: 4
   weight: secondary
 - id: reserve_interest
   label: 储备利息
   sublabel: 储备资产产生的收益主要归发行方
   role: market
+  status: neutral
   layer: 5
   weight: primary
 - id: exchanges_wallets
   label: 交易所钱包
   sublabel: 帮助稳定币流通、托管和兑换
   role: intermediary
+  status: neutral
   layer: 5
   weight: secondary
 - id: crypto_market
   label: 加密市场
   sublabel: 将稳定币用作交易、结算和抵押媒介
   role: market
+  status: neutral
   layer: 6
   weight: secondary
 - id: depeg_risk
   label: 脱锚风险
   sublabel: 储备质量或挤兑压力可能损害兑付
   role: risk
+  status: negative
   layer: 6
   weight: secondary
 - id: regulation
   label: 监管约束
   sublabel: 要求披露储备、限制收益归属或强化赎回规则
   role: constraint
+  status: neutral
   layer: 7
   weight: secondary
 edges:

@@ -21,6 +21,7 @@ nodes:
     label: 用户
     sublabel: 存入资金换取稳定币
     role: buyer
+    status: neutral
     weight: secondary
 
   # ── 法币型 (USDT / USDC) ──
@@ -28,24 +29,28 @@ nodes:
     label: 法币发行方
     sublabel: USDT · USDC
     role: issuer
+    status: neutral
     weight: primary
 
   - id: fiat_reserve
     label: 储备资产
     sublabel: 国债 / 货币基金 / 回购
     role: asset
+    status: neutral
     weight: secondary
 
   - id: fiat_interest
     label: 储备利息
     sublabel: 利息全归发行方；用户零收益
     role: market
+    status: neutral
     weight: primary
 
   - id: redeem_fee
     label: 兑换手续费
     sublabel: 大额赎回收 0.1%
     role: market
+    status: neutral
     weight: muted
 
   # ── 加密抵押型 (DAI / crvUSD) ──
@@ -53,30 +58,35 @@ nodes:
     label: 抵押协议
     sublabel: DAI · crvUSD · MakerDAO
     role: issuer
+    status: neutral
     weight: primary
 
   - id: collateral
     label: 超额抵押品
     sublabel: ETH / BTC，抵押率 150%+
     role: asset
+    status: neutral
     weight: secondary
 
   - id: stability_fee
     label: 稳定费（贷款利率）
     sublabel: 借款人按年利率付息
     role: market
+    status: neutral
     weight: primary
 
   - id: liquidation_penalty
     label: 清算罚款
     sublabel: 抵押不足强制清算，罚 13%
     role: risk
+    status: negative
     weight: secondary
 
   - id: gov_token
     label: 治理代币分红
     sublabel: MKR 持有者获协议利润
     role: intermediary
+    status: neutral
     weight: muted
 
   # ── 收益型 (USDe / sUSDe) ──
@@ -84,24 +94,28 @@ nodes:
     label: 收益发行方
     sublabel: Ethena USDe · sUSDe
     role: issuer
+    status: neutral
     weight: primary
 
   - id: delta_neutral
     label: Delta 中性仓位
     sublabel: 现货多头 + 永续空头对冲
     role: asset
+    status: neutral
     weight: secondary
 
   - id: funding_rate
     label: 资金费率收入
     sublabel: 多头向空头付费；牛市年化 20%+
     role: market
+    status: neutral
     weight: primary
 
   - id: staking_yield
     label: 质押收益分配
     sublabel: 协议抽成后余额给 sUSDe 持有者
     role: market
+    status: neutral
     weight: secondary
 
   # ── 共同风险 ──
@@ -109,12 +123,14 @@ nodes:
     label: 监管约束
     sublabel: 储备披露 / 利息归属限制
     role: constraint
+    status: neutral
     weight: muted
 
   - id: systemic_risk
     label: 系统性风险
     sublabel: 挤兑 / 级联清算 / 资金费转负
     role: risk
+    status: negative
     weight: muted
 
 edges:

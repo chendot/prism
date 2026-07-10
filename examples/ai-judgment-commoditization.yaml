@@ -21,66 +21,77 @@ nodes:
   label: 企业用户
   sublabel: 为自动化判断和决策效率付费
   role: buyer
+  status: neutral
   layer: null
   weight: secondary
 - id: api_market
   label: API市场
   sublabel: 将判断能力按调用量定价
   role: market
+  status: neutral
   layer: null
   weight: secondary
 - id: model_issuer
   label: 模型提供方
   sublabel: 训练并发行可调用的AI能力
   role: issuer
+  status: neutral
   layer: null
   weight: secondary
 - id: judgment_asset
   label: 判断能力
   sublabel: 被封装为可购买的数字资产
   role: asset
+  status: neutral
   layer: null
   weight: secondary
 - id: downstream_apps
   label: 下游应用
   sublabel: 把AI判断嵌入业务流程
   role: intermediary
+  status: neutral
   layer: null
   weight: secondary
 - id: end_customers
   label: 终端客户
   sublabel: 使用含AI判断的产品和服务
   role: buyer
+  status: neutral
   layer: null
   weight: secondary
 - id: compute_cloud
   label: 算力云
   sublabel: 提供推理和训练基础设施
   role: intermediary
+  status: neutral
   layer: null
   weight: secondary
 - id: data_contributors
   label: 数据贡献者
   sublabel: 提供训练语料和行为反馈
   role: buyer
+  status: neutral
   layer: null
   weight: secondary
 - id: platform_fee_capture
   label: 平台抽成
   sublabel: 平台占有主要调用费和分成收益
   role: intermediary
+  status: neutral
   layer: null
   weight: primary
 - id: labor_displacement_risk
   label: 劳动替代风险
   sublabel: 原有判断岗位承受收入和议价压力
   role: risk
+  status: negative
   layer: null
   weight: secondary
 - id: compliance_constraint
   label: 合规约束
   sublabel: 限制高风险场景中的自动化判断
   role: constraint
+  status: neutral
   layer: null
   weight: secondary
 edges:

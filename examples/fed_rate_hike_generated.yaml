@@ -20,46 +20,55 @@ nodes:
   label: 美联储
   sublabel: 上调政策利率并释放紧缩信号
   role: regulator
+  status: neutral
   layer: 1
 - id: short_rates
   label: 短端利率
   sublabel: 银行间资金成本随政策利率上升
   role: market
+  status: neutral
   layer: 2
 - id: bond_yields
   label: 债券收益率
   sublabel: 市场重新定价无风险利率和期限溢价
   role: asset
+  status: neutral
   layer: 3
 - id: banks
   label: 商业银行
   sublabel: 贷款报价提高并收紧授信标准
   role: intermediary
+  status: neutral
   layer: 3
 - id: investors
   label: 投资者
   sublabel: 调整风险资产和现金类资产配置
   role: buyer
+  status: neutral
   layer: 4
 - id: asset_prices
   label: 资产价格
   sublabel: 股票、地产和长久期资产估值承压
   role: asset
+  status: neutral
   layer: 5
 - id: borrowers
   label: 融资主体
   sublabel: 企业和居民面对更高融资成本
   role: issuer
+  status: neutral
   layer: 5
 - id: demand
   label: 总需求
   sublabel: 投资、消费和信用扩张放缓
   role: market
+  status: neutral
   layer: 6
 - id: inflation
   label: 通胀压力
   sublabel: 需求降温后价格上涨压力回落
   role: risk
+  status: negative
   layer: 7
 edges:
 - from: fed

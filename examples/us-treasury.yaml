@@ -20,66 +20,77 @@ nodes:
   label: 投资者
   sublabel: 提供资金购买国债
   role: buyer
+  status: neutral
   layer: 1
   weight: secondary
 - id: primary_dealers
   label: 一级交易商
   sublabel: 承销国债并分销给市场
   role: intermediary
+  status: neutral
   layer: 2
   weight: secondary
 - id: auction
   label: 国债拍卖
   sublabel: 形成价格、利率和中标分配
   role: market
+  status: neutral
   layer: 3
   weight: secondary
 - id: treasury
   label: 美国财政部
   sublabel: 发行国债并获得融资
   role: issuer
+  status: neutral
   layer: 4
   weight: secondary
 - id: treasury_bonds
   label: 美国国债
   sublabel: 政府信用支持的债权资产
   role: asset
+  status: neutral
   layer: 4
   weight: secondary
 - id: fiscal_spending
   label: 财政支出
   sublabel: 募集资金用于政府预算
   role: market
+  status: neutral
   layer: 5
   weight: secondary
 - id: interest_payments
   label: 利息支付
   sublabel: 投资者获得收益，财政承担偿付成本
   role: asset
+  status: neutral
   layer: 5
   weight: primary
 - id: fiscal_revenue
   label: 财政收入
   sublabel: 税收和再融资支撑本息偿付
   role: asset
+  status: neutral
   layer: 6
   weight: secondary
 - id: secondary_market
   label: 二级市场
   sublabel: 国债可交易并形成流动性价格
   role: market
+  status: neutral
   layer: 6
   weight: secondary
 - id: fed_policy
   label: 利率环境
   sublabel: 货币政策影响市场收益率
   role: constraint
+  status: neutral
   layer: 7
   weight: secondary
 - id: interest_rate_risk
   label: 利率风险
   sublabel: 利率上行压低既有债券价格
   role: risk
+  status: negative
   layer: 7
   weight: secondary
 edges:
