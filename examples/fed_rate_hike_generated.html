@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>美联储加息如何传导</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #e8d5b0;
+      background: #1c1612;
+      min-height: 100vh;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+    }
+    main {
+      padding: 16px;
+    }
+    .diagram {
+      border: 1px solid #4a3318;
+      border-radius: 8px;
+      overflow: hidden;
+      width: min(900px, calc(100vw - 32px), calc((100vh - 32px) * 0.75));
+      aspect-ratio: 3 / 4;
+      background: #221a0e;
+    }
+    .prism-svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: #1c1612;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="diagram"><svg class="prism-svg" role="img" aria-label="美联储加息如何传导" width="900" height="1200" viewBox="0 0 900 1200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow-primary" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c9a96e" />
+    </marker>
+    <marker id="arrow-secondary" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#9b7a40" />
+    </marker>
+    <marker id="arrow-danger" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e07b5a" />
+    </marker>
+  </defs>
+  <rect width="900" height="1200" fill="#1c1612" />
+  <rect x="24" y="24" width="852" height="1152" rx="16" fill="#221a0e" stroke="#4a3318" stroke-width="1" opacity="0.42" />
+  <g class="edges"><path d="M 450.0 102.0 L 450.0 193.0" fill="none" stroke="#c9a96e" stroke-width="1.5" marker-end="url(#arrow-primary)" opacity="0.86" /><text x="450.0" y="139.5" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">推高政策锚</text><path d="M 450.0 259.0 L 450.0 304.5 L 296.0 304.5 L 296.0 350.0" fill="none" stroke="#c9a96e" stroke-width="1.5" marker-end="url(#arrow-primary)" opacity="0.86" /><text x="373.0" y="296.5" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">带动收益率上行</text><path d="M 450.0 259.0 L 450.0 304.5 L 604.0 304.5 L 604.0 350.0" fill="none" stroke="#c9a96e" stroke-width="1.5" marker-end="url(#arrow-primary)" opacity="0.86" /><text x="527.0" y="296.5" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">提高资金成本</text><path d="M 296.0 416.0 L 296.0 461.5 L 450.0 461.5 L 450.0 507.0" fill="none" stroke="#9b7a40" stroke-width="1.5" marker-end="url(#arrow-secondary)" opacity="0.86" /><text x="373.0" y="453.5" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">改变风险收益比较</text><path d="M 450.0 573.0 L 450.0 618.5 L 296.0 618.5 L 296.0 664.0" fill="none" stroke="#c9a96e" stroke-width="1.5" marker-end="url(#arrow-primary)" opacity="0.86" /><text x="373.0" y="610.5" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">减少风险资产需求</text><path d="M 604.0 416.0 L 604.0 664.0" fill="none" stroke="#c9a96e" stroke-width="1.5" marker-end="url(#arrow-primary)" opacity="0.86" /><text x="604.0" y="532.0" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">收紧信贷供给</text><path d="M 604.0 730.0 L 604.0 775.5 L 450.0 775.5 L 450.0 821.0" fill="none" stroke="#c9a96e" stroke-width="1.5" marker-end="url(#arrow-primary)" opacity="0.86" /><text x="527.0" y="767.5" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">压低投资消费</text><path d="M 296.0 730.0 L 296.0 775.5 L 450.0 775.5 L 450.0 821.0" fill="none" stroke="#c9a96e" stroke-width="1.5" marker-end="url(#arrow-primary)" opacity="0.86" /><text x="373.0" y="767.5" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">财富效应减弱</text><path d="M 450.0 887.0 L 450.0 978.0" fill="none" stroke="#c9a96e" stroke-width="1.5" marker-end="url(#arrow-primary)" opacity="0.86" /><text x="450.0" y="924.5" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">缓解价格压力</text><path d="M 604.0 1011.0 L 638.0 1011.0 L 638.0 69.0 L 604.0 69.0" fill="none" stroke="#e07b5a" stroke-width="1.5" stroke-dasharray="8 7" marker-end="url(#arrow-danger)" opacity="0.86" /><text x="604.0" y="532.0" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">影响后续政策</text></g>
+  <g class="nodes"><g class="node" data-node-id="fed" opacity="1.0"><rect x="306.0" y="36.0" width="288.0" height="66.0" rx="8" fill="#2a2018" stroke="#c9a96e" stroke-width="2" /><rect class="prism-node-accent" x="306.0" y="36.0" width="5" height="66.0" rx="1" fill="#c9a96e" /><text x="324.0" y="64.0" fill="#c9a96e" font-size="15" font-weight="650" font-family="ui-sans-serif, system-ui">美联储</text><text x="324.0" y="87.0" fill="#c9a96e" font-size="13" opacity="0.78" font-family="ui-sans-serif, system-ui">上调政策利率并释放紧缩信号</text></g><g class="node" data-node-id="short_rates" opacity="1.0"><rect x="306.0" y="193.0" width="288.0" height="66.0" rx="8" fill="#2a2018" stroke="#c9a96e" stroke-width="1" /><rect class="prism-node-accent" x="306.0" y="193.0" width="3" height="66.0" rx="1" fill="#c9a96e" /><text x="324.0" y="221.0" fill="#c9a96e" font-size="15" font-weight="650" font-family="ui-sans-serif, system-ui">短端利率</text><text x="324.0" y="244.0" fill="#c9a96e" font-size="13" opacity="0.78" font-family="ui-sans-serif, system-ui">银行间资金成本随政策利率上升</text></g><g class="node" data-node-id="bond_yields" opacity="1.0"><rect x="152.0" y="350.0" width="288.0" height="66.0" rx="8" fill="#2a2018" stroke="#c9a96e" stroke-width="1" /><rect class="prism-node-accent" x="152.0" y="350.0" width="3" height="66.0" rx="1" fill="#c9a96e" /><text x="170.0" y="378.0" fill="#c9a96e" font-size="15" font-weight="650" font-family="ui-sans-serif, system-ui">债券收益率</text><text x="170.0" y="401.0" fill="#c9a96e" font-size="13" opacity="0.78" font-family="ui-sans-serif, system-ui">市场重新定价无风险利率和期限溢价</text></g><g class="node" data-node-id="banks" opacity="1.0"><rect x="460.0" y="350.0" width="288.0" height="66.0" rx="8" fill="#2a2018" stroke="#c9a96e" stroke-width="1" /><rect class="prism-node-accent" x="460.0" y="350.0" width="3" height="66.0" rx="1" fill="#c9a96e" /><text x="478.0" y="378.0" fill="#c9a96e" font-size="15" font-weight="650" font-family="ui-sans-serif, system-ui">商业银行</text><text x="478.0" y="401.0" fill="#c9a96e" font-size="13" opacity="0.78" font-family="ui-sans-serif, system-ui">贷款报价提高并收紧授信标准</text></g><g class="node" data-node-id="investors" opacity="1.0"><rect x="306.0" y="507.0" width="288.0" height="66.0" rx="8" fill="#2a2018" stroke="#c9a96e" stroke-width="1" /><rect class="prism-node-accent" x="306.0" y="507.0" width="3" height="66.0" rx="1" fill="#c9a96e" /><text x="324.0" y="535.0" fill="#c9a96e" font-size="15" font-weight="650" font-family="ui-sans-serif, system-ui">投资者</text><text x="324.0" y="558.0" fill="#c9a96e" font-size="13" opacity="0.78" font-family="ui-sans-serif, system-ui">调整风险资产和现金类资产配置</text></g><g class="node" data-node-id="asset_prices" opacity="1.0"><rect x="152.0" y="664.0" width="288.0" height="66.0" rx="8" fill="#2a2018" stroke="#c9a96e" stroke-width="1" /><rect class="prism-node-accent" x="152.0" y="664.0" width="3" height="66.0" rx="1" fill="#c9a96e" /><text x="170.0" y="692.0" fill="#c9a96e" font-size="15" font-weight="650" font-family="ui-sans-serif, system-ui">资产价格</text><text x="170.0" y="715.0" fill="#c9a96e" font-size="13" opacity="0.78" font-family="ui-sans-serif, system-ui">股票、地产和长久期资产估值承压</text></g><g class="node" data-node-id="borrowers" opacity="1.0"><rect x="460.0" y="664.0" width="288.0" height="66.0" rx="8" fill="#2a2018" stroke="#c9a96e" stroke-width="1" /><rect class="prism-node-accent" x="460.0" y="664.0" width="3" height="66.0" rx="1" fill="#c9a96e" /><text x="478.0" y="692.0" fill="#c9a96e" font-size="15" font-weight="650" font-family="ui-sans-serif, system-ui">融资主体</text><text x="478.0" y="715.0" fill="#c9a96e" font-size="13" opacity="0.78" font-family="ui-sans-serif, system-ui">企业和居民面对更高融资成本</text></g><g class="node" data-node-id="demand" opacity="1.0"><rect x="307.0" y="821.0" width="286.0" height="66.0" rx="8" fill="#2a2018" stroke="#c9a96e" stroke-width="1" /><rect class="prism-node-accent" x="307.0" y="821.0" width="3" height="66.0" rx="1" fill="#c9a96e" /><text x="325.0" y="849.0" fill="#c9a96e" font-size="15" font-weight="650" font-family="ui-sans-serif, system-ui">总需求</text><text x="325.0" y="872.0" fill="#c9a96e" font-size="13" opacity="0.78" font-family="ui-sans-serif, system-ui">投资、消费和信用扩张放缓</text></g><g class="node" data-node-id="inflation" opacity="1.0"><rect x="306.0" y="978.0" width="288.0" height="66.0" rx="8" fill="#2a2018" stroke="#c9a96e" stroke-width="2" /><rect class="prism-node-accent" x="306.0" y="978.0" width="5" height="66.0" rx="1" fill="#c9a96e" /><text x="324.0" y="1006.0" fill="#c9a96e" font-size="15" font-weight="650" font-family="ui-sans-serif, system-ui">通胀压力</text><text x="324.0" y="1029.0" fill="#c9a96e" font-size="13" opacity="0.78" font-family="ui-sans-serif, system-ui">需求降温后价格上涨压力回落</text></g></g>
+  <g class="feedback-loops"><rect x="48" y="1096" width="804" height="62" rx="10" fill="#221a0e" stroke="#4a3318" stroke-width="1" opacity="0.92" /><text x="62" y="1113" fill="#e8d5b0" font-size="13" font-weight="650" font-family="ui-sans-serif, system-ui">Feedback loops</text><text x="62" y="1135" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">政策-通胀反馈 (negative): fed -&gt; short_rates -&gt; banks -&gt; borrower...</text></g>
+  <text x="852" y="1164" text-anchor="end" fill="#302618" font-size="18" font-family="ui-sans-serif, system-ui">chendot · prism</text>
+</svg></section>
+  </main>
+</body>
+</html>

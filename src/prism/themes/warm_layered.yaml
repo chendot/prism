@@ -9,5 +9,9 @@ accent_risk: "#ff8b68"
 text_primary: "#f7e6c4"
 text_secondary: "#c6a878"
 node_accent_bar_width: 3
+icon_badge_opacity: 0.12
+primary_glow_opacity: 0.28
+highlight_glow_opacity: 0.48
+glow_blur: 3.5
 watermark: "chendot · prism"
 watermark_color: "#6a5135"

@@ -7,6 +7,7 @@ import os
 import re
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -39,6 +40,28 @@ class CompressionError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class GraphPlan:
+    """Short-lived narrative plan used only inside the compression layer."""
+
+    thesis: str
+    template: TemplateName
+    reason: str
+    main_path: tuple[str, ...]
+
+    def display(self) -> str:
+        """Return a compact, human-scannable terminal summary."""
+
+        return "\n".join(
+            [
+                "GraphPlan",
+                f"  thesis: {self.thesis}",
+                f"  template: {self.template} ({self.reason})",
+                f"  main_path: {' → '.join(self.main_path)}",
+            ]
+        )
+
+
+@dataclass(frozen=True)
 class LocalAgentClient:
     """Invoke a local agent CLI without API credentials.
 
@@ -58,6 +81,12 @@ class LocalAgentClient:
         else:
             stdin = prompt
 
+        self._debug(
+            "starting provider subprocess "
+            f"command={command!r} stdin={'yes' if stdin is not None else 'no'} "
+            f"prompt_chars={len(prompt)}"
+        )
+
         try:
             result = subprocess.run(
                 command,
@@ -72,6 +101,16 @@ class LocalAgentClient:
                 f"Local LLM provider command not found for '{self.provider}': {command[0]}"
             ) from error
 
+        self._debug(
+            "provider subprocess completed "
+            f"returncode={result.returncode} stdout_chars={len(result.stdout)} "
+            f"stderr_chars={len(result.stderr)}"
+        )
+        if result.stderr.strip():
+            self._debug(f"provider stderr preview={result.stderr.strip()[:500]!r}")
+        if result.stdout.strip():
+            self._debug(f"provider stdout preview={result.stdout.strip()[:500]!r}")
+
         if result.returncode != 0:
             stderr = result.stderr.strip()
             stdout = result.stdout.strip()
@@ -84,6 +123,10 @@ class LocalAgentClient:
         if not output:
             raise CompressionError(f"Local LLM provider '{self.provider}' returned no output.")
         return output
+
+    def _debug(self, message: str) -> None:
+        if os.environ.get("PRISM_LLM_DEBUG") == "1":
+            print(f"[prism llm] {message}", file=sys.stderr, flush=True)
 
     def _command(self) -> list[str]:
         env_name = {
@@ -110,43 +153,51 @@ class LLMCompressor(Compressor):
     def compress(
         self, topic: str, findings: dict[str, Any] | None, ontology: Ontology
     ) -> PrismDoc:
-        """Classify the explanation template, generate YAML, then validate it."""
+        """Plan the story, expose the plan, then generate validated YAML."""
 
         notes = self._notes_from_findings(findings)
-        template_name = self.choose_template(topic, notes)
-        return self.generate_yaml(topic, notes, template_name, ontology)
+        graph_plan = self.plan_story(topic)
+        print(graph_plan.display())
+        return self.generate_yaml(topic, notes, graph_plan, ontology)
 
-    def choose_template(self, topic: str, notes: str | None) -> TemplateName:
-        """Step 1: ask the local agent which explanation structure best fits."""
+    def plan_story(self, topic: str) -> GraphPlan:
+        """Step 1: choose an explanation structure from a concise story plan."""
 
         prompt = "\n\n".join(
             [
                 self._read_prompt("system.md"),
-                "你现在只做解释结构判断。",
-                "判断规则：",
-                "- 利益分配 / 资金流 / 权力转移 / DeFi -> value_flow",
-                "- 风险传导 / 市场周期 / 政策影响 / 因果链 -> causal_chain",
-                "- 系统分层 / 软件架构 / 能力栈 -> layer_stack",
-                "只输出一个模板名：value_flow、causal_chain 或 layer_stack。",
-                self._topic_prompt(topic, notes),
+                "你现在只做 Story Planning，不生成 prism.yaml。",
+                "根据 topic 和 notes 形成一个可解释的图解计划。",
+                "模板含义：",
+                "- value_flow：利益分配、资金流、权力转移、DeFi。",
+                "- causal_chain：风险传导、市场周期、政策影响、因果链。",
+                "- layer_stack：系统分层、软件架构、能力栈。",
+                "只输出 YAML mapping，且只能包含以下字段：",
+                "thesis: 一句可检验的核心判断",
+                "template: value_flow | causal_chain | layer_stack",
+                "reason: 一句说明为何该结构最适合",
+                "main_path: 3 到 6 个关键概念组成的列表，按叙事顺序排列",
+                self._topic_prompt(topic, None),
             ]
         )
-        template_name = self._extract_template_name(self.client.complete(prompt))
-        if template_name not in VALID_TEMPLATES:
-            raise CompressionError(f"Local agent returned unknown template: {template_name}")
-        return template_name  # type: ignore[return-value]
+        return self._parse_graph_plan(self._complete("GraphPlan", prompt))
+
+    def choose_template(self, topic: str, notes: str | None) -> TemplateName:
+        """Compatibility helper; template selection now comes from GraphPlan."""
+
+        return self.plan_story(topic).template
 
     def generate_yaml(
         self,
         topic: str,
         notes: str | None,
-        template_name: TemplateName,
+        graph_plan: GraphPlan,
         ontology: Ontology,
     ) -> PrismDoc:
-        """Step 2: generate a Prism YAML document and retry validation failures."""
+        """Step 3: realize a GraphPlan as YAML and retry validation failures."""
 
-        system_prompt = self._build_generation_prompt(template_name, ontology)
-        user_prompt = self._generation_user_prompt(topic, notes)
+        system_prompt = self._build_generation_prompt(graph_plan.template, ontology)
+        user_prompt = self._generation_user_prompt(topic, notes, graph_plan)
         retry_context = ""
         last_yaml = ""
         last_error = ""
@@ -155,7 +206,7 @@ class LLMCompressor(Compressor):
             prompt = "\n\n".join(
                 part for part in [system_prompt, user_prompt, retry_context] if part
             )
-            raw_yaml = self._strip_yaml_fence(self.client.complete(prompt))
+            raw_yaml = self._strip_yaml_fence(self._complete("YAML", prompt))
             last_yaml = raw_yaml
 
             try:
@@ -163,10 +214,12 @@ class LLMCompressor(Compressor):
                 if not isinstance(doc_dict, dict):
                     raise CompressionError("LLM output is not a YAML mapping.")
                 doc_dict.setdefault("meta", {})
+                doc_dict.setdefault("diagram", {})
                 doc_dict["meta"]["topic"] = topic
                 doc_dict["meta"]["ontology"] = ontology.name
-                doc_dict["meta"]["template"] = template_name
+                doc_dict["meta"]["template"] = graph_plan.template
                 doc_dict["meta"].setdefault("visual_theme", "warm_layered")
+                doc_dict["diagram"]["thesis"] = graph_plan.thesis
                 prism = PrismDoc.model_validate(doc_dict)
                 return validate_prism_doc(prism, ontology)
             except (
@@ -189,7 +242,7 @@ class LLMCompressor(Compressor):
 
         raise CompressionError(
             "Local agent compression failed after validation retries.\n"
-            f"Template: {template_name}\n"
+            f"Template: {graph_plan.template}\n"
             f"Validation error:\n{last_error}\n"
             f"Last YAML:\n{last_yaml}"
         )
@@ -250,10 +303,16 @@ class LLMCompressor(Compressor):
             parts.append(f"Few-shot example: {path.name}\n{path.read_text(encoding='utf-8')}")
         return "\n\n".join(parts)
 
-    def _generation_user_prompt(self, topic: str, notes: str | None) -> str:
+    def _generation_user_prompt(
+        self, topic: str, notes: str | None, graph_plan: GraphPlan
+    ) -> str:
         return "\n\n".join(
             [
-                "请根据 topic 和 notes 生成完整 prism.yaml。",
+                "请根据 topic、notes 和锁定的 GraphPlan 生成完整 prism.yaml。",
+                "不得重新选择 template、改变 thesis 或改变 main_path 的叙事顺序。",
+                "把 GraphPlan.thesis 原样写入 diagram.thesis。",
+                "GraphPlan：",
+                graph_plan.display(),
                 self._topic_prompt(topic, notes),
                 "输出要求：只输出 YAML，不要 markdown 代码块，不要解释文字。",
             ]
@@ -266,6 +325,24 @@ class LLMCompressor(Compressor):
         if not findings:
             return None
         return json.dumps(findings, ensure_ascii=False, indent=2, default=str)
+
+    def _complete(self, step: str, prompt: str) -> str:
+        """Invoke the provider while exposing step boundaries in debug mode."""
+
+        if os.environ.get("PRISM_LLM_DEBUG") == "1":
+            print(
+                f"[prism llm] {step} request started (prompt_chars={len(prompt)})",
+                file=sys.stderr,
+                flush=True,
+            )
+        output = self.client.complete(prompt)
+        if os.environ.get("PRISM_LLM_DEBUG") == "1":
+            print(
+                f"[prism llm] {step} response received (output_chars={len(output)})",
+                file=sys.stderr,
+                flush=True,
+            )
+        return output
 
     def _read_prompt(self, filename: str) -> str:
         path = PROMPT_DIR / filename
@@ -284,6 +361,40 @@ class LLMCompressor(Compressor):
             if re.search(rf"\b{re.escape(template_name)}\b", text):
                 return template_name
         return text.strip().strip("`")
+
+    def _parse_graph_plan(self, text: str) -> GraphPlan:
+        """Parse and minimally validate the LLM's transient story plan."""
+
+        try:
+            data = yaml.safe_load(self._strip_yaml_fence(text))
+        except yaml.YAMLError as error:
+            raise CompressionError(f"GraphPlan is not valid YAML: {error}") from error
+        if not isinstance(data, dict):
+            raise CompressionError("GraphPlan must be a YAML mapping.")
+
+        thesis = data.get("thesis")
+        template = data.get("template")
+        reason = data.get("reason")
+        main_path = data.get("main_path")
+        if not isinstance(thesis, str) or not thesis.strip():
+            raise CompressionError("GraphPlan requires a non-empty thesis.")
+        if template not in VALID_TEMPLATES:
+            raise CompressionError(f"GraphPlan returned unknown template: {template}")
+        if not isinstance(reason, str) or not reason.strip():
+            raise CompressionError("GraphPlan requires a non-empty reason.")
+        if (
+            not isinstance(main_path, list)
+            or not 3 <= len(main_path) <= 6
+            or not all(isinstance(item, str) and item.strip() for item in main_path)
+        ):
+            raise CompressionError("GraphPlan main_path must contain 3 to 6 non-empty strings.")
+
+        return GraphPlan(
+            thesis=thesis.strip(),
+            template=template,
+            reason=reason.strip(),
+            main_path=tuple(item.strip() for item in main_path),
+        )
 
     def _strip_yaml_fence(self, text: str) -> str:
         match = re.search(r"```(?:yaml|yml)?\s*(.*?)```", text, flags=re.DOTALL)

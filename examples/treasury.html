@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>美债如何运作</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #e8d5b0;
+      background: #1c1612;
+      min-height: 100vh;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+    }
+    main {
+      padding: 16px;
+    }
+    .diagram {
+      border: 1px solid #4a3318;
+      border-radius: 8px;
+      overflow: hidden;
+      width: min(900px, calc(100vw - 32px), calc((100vh - 32px) * 0.75));
+      aspect-ratio: 3 / 4;
+      background: #221a0e;
+    }
+    .prism-svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: #1c1612;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="diagram"><svg class="prism-svg" role="img" aria-label="美债如何运作" width="900" height="1200" viewBox="0 0 900 1200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow-primary" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c9a96e" />
+    </marker>
+    <marker id="arrow-secondary" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#9b7a40" />
+    </marker>
+    <marker id="arrow-danger" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e07b5a" />
+    </marker>
+  </defs>
+  <rect width="900" height="1200" fill="#1c1612" />
+  <rect x="24" y="24" width="852" height="1152" rx="16" fill="#221a0e" stroke="#4a3318" stroke-width="1" opacity="0.42" />
+  <g class="edges"><path d="M 296.0 102.0 L 296.0 350.0" fill="none" stroke="#c9a96e" stroke-width="1.5" marker-end="url(#arrow-primary)" opacity="0.86" /><text x="296.0" y="218.0" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">发起发行</text><path d="M 296.0 416.0 L 296.0 540.0 L 604.0 540.0 L 604.0 664.0" fill="none" stroke="#c9a96e" stroke-width="1.5" marker-end="url(#arrow-primary)" opacity="0.86" /><text x="450.0" y="532.0" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">形成债券</text><path d="M 604.0 1011.0 L 638.0 1011.0 L 638.0 383.0 L 450.0 383.0" fill="none" stroke="#c9a96e" stroke-width="1.5" stroke-dasharray="8 7" marker-end="url(#arrow-primary)" opacity="0.86" /><text x="527.0" y="689.0" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">投标承销</text><path d="M 296.0 730.0 L 296.0 854.0 L 450.0 854.0 L 450.0 978.0" fill="none" stroke="#c9a96e" stroke-width="1.5" marker-end="url(#arrow-primary)" opacity="0.86" /><text x="373.0" y="846.0" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">购买</text><path d="M 758.0 697.0 L 792.0 697.0 L 792.0 697.0 L 450.0 697.0" fill="none" stroke="#c9a96e" stroke-width="1.5" stroke-dasharray="8 7" marker-end="url(#arrow-primary)" opacity="0.86" /><text x="604.0" y="689.0" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">本息承诺</text><path d="M 604.0 102.0 L 604.0 383.0 L 296.0 383.0 L 296.0 664.0" fill="none" stroke="#9b7a40" stroke-width="1.5" marker-end="url(#arrow-secondary)" opacity="0.86" /><text x="450.0" y="375.0" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">利率预期</text><path d="M 604.0 102.0 L 604.0 350.0" fill="none" stroke="#c9a96e" stroke-width="1.5" marker-end="url(#arrow-primary)" opacity="0.86" /><text x="604.0" y="218.0" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">加息提高久期风险</text><path d="M 604.0 416.0 L 604.0 540.0 L 296.0 540.0 L 296.0 664.0" fill="none" stroke="#c9a96e" stroke-width="1.5" marker-end="url(#arrow-primary)" opacity="0.86" /><text x="450.0" y="532.0" text-anchor="middle" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">改变需求</text></g>
+  <g class="nodes"><g class="node" data-node-id="treasury" opacity="1.0"><rect x="152.0" y="36.0" width="288.0" height="66.0" rx="8" fill="#2a2018" stroke="#c9a96e" stroke-width="2" /><rect class="prism-node-accent" x="152.0" y="36.0" width="5" height="66.0" rx="1" fill="#c9a96e" /><text x="170.0" y="64.0" fill="#c9a96e" font-size="15" font-weight="650" font-family="ui-sans-serif, system-ui">美国财政部</text><text x="170.0" y="87.0" fill="#c9a96e" font-size="13" opacity="0.78" font-family="ui-sans-serif, system-ui">发行国债以筹集财政资金</text></g><g class="node" data-node-id="fed" opacity="0.7"><rect x="481.6" y="41.0" width="244.8" height="56.1" rx="8" fill="none" stroke="#5a4d3a" stroke-width="2" /><rect class="prism-node-accent" x="481.6" y="41.0" width="5" height="56.1" rx="1" fill="#5a4d3a" /><text x="499.6" y="69.0" fill="#8a7a5c" font-size="15" font-weight="650" font-family="ui-sans-serif, system-ui">美联储</text><text x="499.6" y="92.0" fill="#8a7a5c" font-size="13" opacity="0.78" font-family="ui-sans-serif, system-ui">通过货币政策影响利率环境</text></g><g class="node" data-node-id="auction" opacity="1.0"><rect x="152.0" y="350.0" width="288.0" height="66.0" rx="8" fill="#2a2018" stroke="#c9a96e" stroke-width="1" /><rect class="prism-node-accent" x="152.0" y="350.0" width="3" height="66.0" rx="1" fill="#c9a96e" /><text x="170.0" y="378.0" fill="#c9a96e" font-size="15" font-weight="650" font-family="ui-sans-serif, system-ui">国债拍卖</text><text x="170.0" y="401.0" fill="#c9a96e" font-size="13" opacity="0.78" font-family="ui-sans-serif, system-ui">决定发行价格与收益率</text></g><g class="node" data-node-id="interest_rate_risk" opacity="0.7"><rect x="481.6" y="354.9" width="244.8" height="56.1" rx="8" fill="none" stroke="#5a4d3a" stroke-width="1" /><rect class="prism-node-accent" x="481.6" y="354.9" width="3" height="56.1" rx="1" fill="#5a4d3a" /><text x="499.6" y="382.9" fill="#8a7a5c" font-size="15" font-weight="650" font-family="ui-sans-serif, system-ui">利率风险</text><text x="499.6" y="405.9" fill="#8a7a5c" font-size="13" opacity="0.78" font-family="ui-sans-serif, system-ui">利率上行会压低既有债券价格</text></g><g class="node" data-node-id="investors" opacity="1.0"><rect x="152.0" y="664.0" width="288.0" height="66.0" rx="8" fill="#2a2018" stroke="#c9a96e" stroke-width="1" /><rect class="prism-node-accent" x="152.0" y="664.0" width="3" height="66.0" rx="1" fill="#c9a96e" /><text x="170.0" y="692.0" fill="#c9a96e" font-size="15" font-weight="650" font-family="ui-sans-serif, system-ui">投资者</text><text x="170.0" y="715.0" fill="#c9a96e" font-size="13" opacity="0.78" font-family="ui-sans-serif, system-ui">机构、个人、外国央行</text></g><g class="node" data-node-id="treasury_bonds" opacity="1.0"><rect x="409.6" y="652.5" width="388.8" height="89.1" rx="8" fill="#e07b5a" stroke="#e07b5a" stroke-width="1" /><rect class="prism-node-accent" x="409.6" y="652.5" width="3" height="89.1" rx="1" fill="#e07b5a" /><text x="427.6" y="680.5" fill="#fdf6ec" font-size="15" font-weight="650" font-family="ui-sans-serif, system-ui">美国国债</text><text x="427.6" y="703.5" fill="#fdf6ec" font-size="13" opacity="0.78" font-family="ui-sans-serif, system-ui">政府信用支持的债务资产</text></g><g class="node" data-node-id="primary_dealers" opacity="1.0"><rect x="306.0" y="978.0" width="288.0" height="66.0" rx="8" fill="#2a2018" stroke="#c9a96e" stroke-width="1" /><rect class="prism-node-accent" x="306.0" y="978.0" width="3" height="66.0" rx="1" fill="#c9a96e" /><text x="324.0" y="1006.0" fill="#c9a96e" font-size="15" font-weight="650" font-family="ui-sans-serif, system-ui">一级交易商</text><text x="324.0" y="1029.0" fill="#c9a96e" font-size="13" opacity="0.78" font-family="ui-sans-serif, system-ui">承销并提供市场流动性</text></g></g>
+  <g class="feedback-loops"><rect x="48" y="1096" width="804" height="62" rx="10" fill="#221a0e" stroke="#4a3318" stroke-width="1" opacity="0.92" /><text x="62" y="1113" fill="#e8d5b0" font-size="13" font-weight="650" font-family="ui-sans-serif, system-ui">Feedback loops</text><text x="62" y="1135" fill="#7a6040" font-size="13" font-family="ui-sans-serif, system-ui">利率-需求反馈 (negative): fed -&gt; interest_rate_risk -&gt; investors...</text></g>
+  <text x="852" y="1164" text-anchor="end" fill="#302618" font-size="18" font-family="ui-sans-serif, system-ui">chendot · prism</text>
+</svg></section>
+  </main>
+</body>
+</html>

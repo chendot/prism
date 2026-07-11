@@ -93,3 +93,19 @@ def test_render_rejects_unimplemented_renderers_gracefully(tmp_path: Path) -> No
 
         assert result.exit_code != 0
         assert f"Renderer '{renderer_name}' is planned but not implemented yet." in result.output
+
+
+def test_render_defaults_to_outputs_directory(
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
+    source = Path("examples/treasury.yaml").read_text(encoding="utf-8")
+    file = tmp_path / "treasury-copy.yaml"
+    file.write_text(source, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(cli.app, ["render", str(file)])
+
+    output = tmp_path / "outputs" / "treasury-copy.html"
+    assert result.exit_code == 0
+    assert output.exists()
+    assert f"Rendered: outputs/treasury-copy.html" in result.output

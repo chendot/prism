@@ -27,6 +27,10 @@ class VisualTheme:
     text_primary: str
     text_secondary: str
     node_accent_bar_width: int
+    icon_badge_opacity: float
+    primary_glow_opacity: float
+    highlight_glow_opacity: float
+    glow_blur: float
     watermark: str
     watermark_color: str
 
@@ -52,6 +56,10 @@ def load_theme(name: str | None) -> VisualTheme:
         text_primary=data["text_primary"],
         text_secondary=data["text_secondary"],
         node_accent_bar_width=int(data["node_accent_bar_width"]),
+        icon_badge_opacity=float(data["icon_badge_opacity"]),
+        primary_glow_opacity=float(data["primary_glow_opacity"]),
+        highlight_glow_opacity=float(data["highlight_glow_opacity"]),
+        glow_blur=float(data["glow_blur"]),
         watermark=data["watermark"],
         watermark_color=data["watermark_color"],
     )

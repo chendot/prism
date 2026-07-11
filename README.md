@@ -21,14 +21,17 @@ python -m venv .venv
 渲染后会生成：
 
 ```text
-examples/treasury.html
+outputs/treasury.html
 ```
+
+`examples/` 只存放可提交的成熟 YAML 模板和样例；未指定 `--output` 的生成 YAML、HTML 和 research 结果统一写入 `outputs/`（该目录已被 Git 忽略）。如需指定文件名，可传入 `--output`。
 
 ## 常用命令
 
 ```bash
 prism validate examples/treasury.yaml
 prism render examples/treasury.yaml
+prism render examples/treasury.yaml --output outputs/treasury-preview.html
 prism compress "美债如何运作" --ontology financial
 prism research "美债如何运作" --ontology financial
 prism run "美债如何运作" --ontology financial --skip-research

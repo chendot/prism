@@ -35,23 +35,31 @@ class RenderError(RuntimeError):
 @dataclass(frozen=True)
 class LayoutConfig:
     top_margin: int = 32
+    header_height: int = 104
     bottom_margin: int = 72
     lane_padding: int = 40
     node_gap: int = 56
     node_height: int = 64
     node_width: int = 280
+    node_max_width: int = 340
+    node_one_line_slack: int = 8
     node_width_ratio: float = 0.85
     fanout_curve_height: int = 80
     convergence_curve_height: int = 48
     label_gap_ratio: float = 0.5
     label_bg_padding_x: int = 4
     label_bg_padding_y: int = 2
+    edge_label_bg_padding_x: int = 7
+    edge_label_bg_padding_y: int = 4
+    label_bg_opacity: float = 0.98
     arrowhead_size: int = 8
     canvas_width: int = 900
     title_font_weight: int = 700
     subtitle_opacity: float = 0.84
     edge_label_opacity: float = 0.94
     edge_opacity: float = 0.96
+    feedback_edge_opacity: float = 0.38
+    feedback_edge_width_scale: float = 0.72
     edge_label_font_size_offset: int = -1
     edge_port_gap: int = 12
     edge_track_gap: int = 12
@@ -66,6 +74,9 @@ class LayoutConfig:
     watermark_font_size: int = 18
     icon_size: int = 16
     node_text_padding: int = 18
+    node_vertical_padding: int = 14
+    header_title_font_size: int = 26
+    header_thesis_font_size: int = 14
 
 
 class MermaidRenderer(Renderer):
@@ -217,9 +228,15 @@ class MermaidRenderer(Renderer):
       <stop offset="0%" stop-color="{theme.accent_risk}" />
       <stop offset="100%" stop-color="{theme.accent_risk}" stop-opacity="0.2" />
     </linearGradient>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
-      <feFlood flood-color="{theme.accent_result}" flood-opacity="0.6" result="glow-color" />
+    <filter id="glow_primary" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="{theme.glow_blur:g}" result="blur" />
+      <feFlood flood-color="{theme.accent_primary}" flood-opacity="{theme.primary_glow_opacity:g}" result="glow-color" />
+      <feComposite in="glow-color" in2="blur" operator="in" result="glow" />
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow_highlight" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="{theme.glow_blur:g}" result="blur" />
+      <feFlood flood-color="{theme.accent_result}" flood-opacity="{theme.highlight_glow_opacity:g}" result="glow-color" />
       <feComposite in="glow-color" in2="blur" operator="in" result="glow" />
       <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
@@ -1928,7 +1945,11 @@ class MermaidRenderer(Renderer):
             border_dash,
         )
         dash = self._stroke_dash_attribute(border_dash)
-        glow_filter = ' filter="url(#glow)"' if status == "highlight" else ""
+        glow_filter = ""
+        if status == "highlight":
+            glow_filter = ' filter="url(#glow_highlight)"'
+        elif node.weight == "primary":
+            glow_filter = ' filter="url(#glow_primary)"'
         icon_size = 16
         icon_text_gap = 8
         text_x = x + 18 + icon_size + icon_text_gap
@@ -1968,10 +1989,15 @@ class MermaidRenderer(Renderer):
         accent_bar = ""
         if bool(visual["accent_bar"]):
             bar_gradient = self._accent_bar_gradient(status)
+            accent_radius = min(radius, height / 2)
             accent_bar = (
-                f'<rect class="prism-node-accent" x="{x:.1f}" y="{y:.1f}" '
-                f'width="{theme.node_accent_bar_width}" height="{height:.1f}" rx="1" '
-                f'fill="url(#{bar_gradient})" />'
+                f'<path class="prism-node-accent" '
+                f'd="M {x + accent_radius:.1f} {y:.1f} '
+                f'Q {x:.1f} {y:.1f} {x:.1f} {y + accent_radius:.1f} '
+                f'V {y + height - accent_radius:.1f} '
+                f'Q {x:.1f} {y + height:.1f} {x + accent_radius:.1f} {y + height:.1f}" '
+                f'fill="none" stroke="url(#{bar_gradient})" '
+                f'stroke-width="{theme.node_accent_bar_width}" stroke-linecap="round" />'
             )
         icon_color = text_color if status in {"positive", "highlight"} else border
         icon = self._render_svg_icon(
@@ -2012,6 +2038,9 @@ class MermaidRenderer(Renderer):
             icon_x += theme.node_accent_bar_width + 8
         icon_y = y + height / 2 - icon_size / 2
         return (
+            f'<rect class="prism-node-icon-badge" x="{icon_x - 6:.1f}" y="{icon_y - 6:.1f}" '
+            f'width="{icon_size + 12}" height="{icon_size + 12}" rx="7" fill="{border}" '
+            f'opacity="{theme.icon_badge_opacity:g}" />'
             f'<svg class="prism-node-icon" x="{icon_x:.1f}" y="{icon_y:.1f}" '
             f'width="{icon_size}" height="{icon_size}" viewBox="0 0 24 24" fill="none" '
             f'stroke="{border}" stroke-width="1.8" stroke-linecap="round" '

@@ -13,6 +13,16 @@ def test_schema_loads_treasury_example() -> None:
     assert prism.edges[0].from_ == "treasury"
 
 
+def test_schema_accepts_optional_diagram_thesis() -> None:
+    prism = PrismDoc.from_yaml("examples/treasury.yaml")
+    data = prism.model_dump(mode="json", by_alias=True)
+    data["diagram"]["thesis"] = "利息收益的归属决定了激励分配。"
+
+    validated = PrismDoc.model_validate(data)
+
+    assert validated.diagram.thesis == "利息收益的归属决定了激励分配。"
+
+
 def test_schema_rejects_non_snake_case_node_id() -> None:
     data = {
         "meta": {

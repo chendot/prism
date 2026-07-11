@@ -60,7 +60,7 @@ def render(file: Path, output: Path | None = typer.Option(None, "--output", "-o"
 
     if output is None:
         suffix = ".html" if prism.render.renderer == RendererName.MERMAID else ".out"
-        output = file.with_suffix(suffix)
+        output = DEFAULT_OUTPUT_DIR / f"{file.stem}{suffix}"
     write_text(output, content)
     typer.echo(f"Rendered: {output}")
 

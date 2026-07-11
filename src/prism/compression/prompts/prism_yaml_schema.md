@@ -23,6 +23,9 @@ diagram 必填字段：
 - type: flow | system | cycle | layer | comparison | timeline | decision_tree
 - direction: TD | LR | BT | RL
 
+diagram 可选字段：
+- thesis: 一句核心判断；必须与给定 GraphPlan 的 thesis 保持一致
+
 nodes 每项必填：
 - id: lowercase snake_case，唯一
 - label: 短标签

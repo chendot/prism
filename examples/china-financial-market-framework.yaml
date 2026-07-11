@@ -1,0 +1,210 @@
+meta:
+  title: 中国金融市场：从政策边界到实体融资的传导链条
+  subtitle: 以资金循环为主线，银行体系与风险反馈为两条关键横轴
+  topic: 中国金融市场的领域框架、资金流转与风险传导
+  ontology: financial
+  template: layer_stack
+  visual_theme: warm_layered
+  target_format: xiaohongshu_card
+  audience: intermediate
+  language: zh
+  tags:
+    - china_finance
+    - market_structure
+    - layer_stack
+    - capital_flow
+
+diagram:
+  type: layer
+  direction: TD
+  thesis: 政策划定边界，银行与市场分别承接信贷和定价；居民与企业既提供资金，也通过融资与消费使用资金，构成服务实体的循环。
+
+nodes:
+  - id: policy_and_regulation
+    label: 宏观政策与监管
+    sublabel: 财政、货币、汇率与审慎监管
+    role: regulator
+    layer: 0
+    weight: primary
+    status: highlight
+  - id: financial_infrastructure
+    label: 金融基础设施
+    sublabel: 支付清算、交易、登记结算与征信
+    role: protocol
+    layer: 1
+    weight: secondary
+    status: neutral
+  - id: capital_supply
+    label: 资金供给
+    sublabel: 居民、企业、财政、保险与外资
+    role: buyer
+    layer: 2
+    weight: secondary
+    status: neutral
+  - id: banking_system
+    label: 银行体系
+    sublabel: 存贷款（直达实体）、理财与债券配置
+    role: intermediary
+    layer: 3
+    weight: primary
+    status: highlight
+  - id: asset_management
+    label: 资管与金融中介
+    sublabel: 券商、基金、保险、信托与私募
+    role: intermediary
+    layer: 3
+    weight: secondary
+    status: neutral
+  - id: financial_markets
+    label: 市场与资产定价
+    sublabel: 货币、债券、股票、基金、外汇与衍生品
+    role: market
+    layer: 4
+    weight: primary
+    status: highlight
+  - id: government_financing
+    label: 政府与基建融资
+    sublabel: 国债、地方债与政策性金融
+    role: issuer
+    layer: 5
+    weight: secondary
+    status: neutral
+  - id: corporate_financing
+    label: 企业融资
+    sublabel: 银行信贷，以及债券与股权融资
+    role: issuer
+    layer: 5
+    weight: secondary
+    status: neutral
+  - id: household_sector
+    label: 居民部门
+    sublabel: 住房、消费、储蓄与财富管理
+    role: buyer
+    layer: 5
+    weight: muted
+    status: neutral
+  - id: real_economy
+    label: 实体经济
+    sublabel: 投资、就业、收入与企业现金流
+    role: benefit
+    layer: 6
+    weight: primary
+    status: positive
+  - id: systemic_risk
+    label: 风险反馈
+    sublabel: 地产、地方财政、银行与跨境冲击
+    role: risk
+    layer: 7
+    weight: secondary
+    status: negative
+
+edges:
+  - from: policy_and_regulation
+    to: financial_infrastructure
+    label: 规则与流动性
+    type: control
+    direction: forward
+  - from: policy_and_regulation
+    to: banking_system
+    label: 利率与资本约束
+    type: control
+    direction: forward
+  - from: financial_infrastructure
+    to: capital_supply
+    label: 账户与支付基础
+    type: authorization
+    direction: forward
+  - from: capital_supply
+    to: banking_system
+    label: 存款、理财
+    type: fund_flow
+    direction: forward
+  - from: capital_supply
+    to: asset_management
+    label: 委托资金
+    type: fund_flow
+    direction: forward
+  - from: banking_system
+    to: financial_markets
+    label: 债券配置与定价
+    type: fund_flow
+    direction: forward
+  - from: banking_system
+    to: corporate_financing
+    label: 贷款直达
+    type: fund_flow
+    direction: forward
+  - from: asset_management
+    to: financial_markets
+    label: 投资与定价
+    type: fund_flow
+    direction: forward
+  - from: financial_markets
+    to: government_financing
+    label: 债券融资
+    type: fund_flow
+    direction: forward
+  - from: financial_markets
+    to: corporate_financing
+    label: 债券与股权融资
+    type: fund_flow
+    direction: forward
+  - from: financial_markets
+    to: household_sector
+    label: 住房与财富管理
+    type: fund_flow
+    direction: forward
+  - from: government_financing
+    to: real_economy
+    label: 公共投资
+    type: benefit_flow
+    direction: forward
+  - from: corporate_financing
+    to: real_economy
+    label: 生产与就业
+    type: benefit_flow
+    direction: forward
+  - from: household_sector
+    to: real_economy
+    label: 消费与住房
+    type: benefit_flow
+    direction: forward
+  - from: real_economy
+    to: systemic_risk
+    label: 现金流与信用风险
+    type: causal
+    direction: forward
+  - from: systemic_risk
+    to: banking_system
+    label: 信用收缩
+    type: feedback
+    direction: backward
+  - from: systemic_risk
+    to: policy_and_regulation
+    label: 逆周期应对
+    type: feedback
+    direction: backward
+
+loops:
+  - id: credit_risk_feedback
+    label: 实体现金流走弱会经信用风险收紧金融条件，反过来影响融资与增长
+    nodes:
+      - banking_system
+      - financial_markets
+      - corporate_financing
+      - real_economy
+      - systemic_risk
+    polarity: negative
+
+render:
+  template: layer_stack
+  style: default
+  show_loops: false
+  lanes: []
+  highlight_nodes:
+    - policy_and_regulation
+    - banking_system
+    - financial_markets
+    - real_economy
+  highlight_edges: []
+  renderer: mermaid

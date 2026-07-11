@@ -62,18 +62,60 @@
     return payload.ontology.roles[node.role]?.visual || {};
   }
 
+  function weightVisual(payload, node) {
+    return payload.ontology.weights[node.weight] || {};
+  }
+
+  function wrapText(text, maxChars) {
+    if (!text) return [];
+    const lines = [];
+    let remaining = text.trim();
+    while (remaining) {
+      lines.push(remaining.slice(0, maxChars));
+      remaining = remaining.slice(maxChars).trim();
+    }
+    return lines;
+  }
+
+  function nodeTextLayout(payload, node, width) {
+    const config = payload.layout;
+    const iconFootprint = config.node_text_padding + config.icon_size + 12;
+    const available = width - iconFootprint - config.node_text_padding;
+    const titleChars = Math.max(4, Math.floor(available / config.node_title_font_size));
+    const subtitleChars = Math.max(6, Math.floor(available / config.node_subtitle_font_size));
+    const titleLines = wrapText(node.label, titleChars);
+    const subtitleLines = wrapText(node.sublabel, subtitleChars);
+    const contentHeight =
+      titleLines.length * 18 +
+      (subtitleLines.length ? 4 + subtitleLines.length * 16 : 0);
+    return {
+      titleLines,
+      subtitleLines,
+      contentHeight,
+      height: Math.max(config.node_height, contentHeight + 2 * config.node_vertical_padding),
+    };
+  }
+
   function nodeDimensions(payload, node, parallelLaneCount) {
     const config = payload.layout;
     const visual = roleVisual(payload, node);
-    const scale = Number(visual.scale || 1);
+    const weight = weightVisual(payload, node);
+    const scale = Number(visual.scale || 1) * Number(weight.scale || 1);
     const baseWidth = parallelLaneCount
       ? ((config.canvas_width - 2 * config.lane_padding) / parallelLaneCount) *
         config.node_width_ratio
       : config.node_width;
-    return {
-      width: baseWidth * scale,
-      height: config.node_height * scale,
-    };
+    const iconAndPadding = 2 * config.node_text_padding + config.icon_size + 12;
+    const contentWidth = Math.max(
+      estimateTextWidth(node.label, config.node_title_font_size),
+      estimateTextWidth(node.sublabel || "", config.node_subtitle_font_size)
+    );
+    const preferredWidth = iconAndPadding + contentWidth + config.node_one_line_slack;
+    const unscaledWidth = parallelLaneCount
+      ? baseWidth
+      : Math.min(config.node_max_width, Math.max(baseWidth, preferredWidth));
+    const width = unscaledWidth * scale;
+    return { width, height: nodeTextLayout(payload, node, width).height * scale };
   }
 
   function estimateTextWidth(text, fontSize) {
@@ -205,7 +247,7 @@
       return {
         ...node,
         x: positioned.x,
-        y: positioned.y,
+        y: positioned.y + payload.layout.header_height,
         width: positioned.width,
         height: positioned.height,
         parent: graph.parent(node.id) || null,
@@ -218,9 +260,12 @@
         const edge = renderedEdges[positioned.edgeIndex];
         return {
           ...edge,
-          points: positioned.points,
+          points: positioned.points.map((point) => ({
+            ...point,
+            y: point.y + payload.layout.header_height,
+          })),
           x: positioned.x,
-          y: positioned.y,
+          y: positioned.y + payload.layout.header_height,
         };
       })
       .filter(Boolean);
@@ -231,7 +276,7 @@
         title: lane.title,
         order: lane.order,
         x: positioned.x,
-        y: positioned.y,
+        y: positioned.y + payload.layout.header_height,
         width: positioned.width,
         height: positioned.height,
       };
@@ -239,8 +284,8 @@
     const normalized = isParallel(payload)
       ? normalizeParallelLaneOrder(payload, { nodes, edges, clusters, shared })
       : { nodes, edges, clusters, width: graph.graph().width };
-    const deferredLayoutEdges = deferredEdges.map(({ edge }) =>
-      routeDeferredEdge(edge, normalized.nodes, normalized.width, payload.layout)
+    const deferredLayoutEdges = deferredEdges.map(({ edge }, index) =>
+      routeDeferredEdge(edge, normalized.nodes, normalized.width, payload.layout, index)
     );
     const loopPanelHeight =
       prism.render.show_loops && prism.loops.length ? payload.layout.node_height + 32 : 0;
@@ -250,25 +295,27 @@
       clusters: normalized.clusters,
       shared,
       width: Math.max(payload.layout.canvas_width, normalized.width),
-      height: graph.graph().height + payload.layout.bottom_margin + loopPanelHeight,
-      graphHeight: graph.graph().height,
+      height: graph.graph().height + payload.layout.header_height + payload.layout.bottom_margin + loopPanelHeight,
+      graphHeight: graph.graph().height + payload.layout.header_height,
       loopPanelHeight,
       dagreVersion: root.dagre.version,
     };
   }
 
-  function routeDeferredEdge(edge, nodes, width, config) {
+  function routeDeferredEdge(edge, nodes, width, config, railIndex) {
     const source = nodes.find((node) => node.id === edge.from);
     const target = nodes.find((node) => node.id === edge.to);
-    const routeX = width - config.edge_outer_margin;
+    const railSpacing = Math.max(config.edge_track_gap * 3, 36);
+    const routeX = width - config.edge_outer_margin - railIndex * railSpacing;
     const start = { x: source.x + source.width / 2, y: source.y };
     const end = { x: target.x + target.width / 2, y: target.y };
+    const labelWidth = estimateTextWidth(edge.label || "", config.edge_label_font_size);
     return {
       ...edge,
       deferred: true,
       points: [start, { x: routeX, y: start.y }, { x: routeX, y: end.y }, end],
-      x: routeX - estimateTextWidth(edge.label || "", config.edge_label_font_size) / 2,
-      y: (start.y + end.y) / 2,
+      x: routeX - labelWidth / 2 - 10,
+      y: end.y + (railIndex ? -18 : 18),
     };
   }
 
@@ -360,12 +407,17 @@
         defs.appendChild(marker);
       });
     });
-    const glow = createSvg("filter", { id: "glow", x: "-20%", y: "-20%", width: "140%", height: "140%" });
-    glow.innerHTML = `<feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />` +
-      `<feFlood flood-color="${theme.accent_result}" flood-opacity="0.6" result="glow-color" />` +
-      `<feComposite in="glow-color" in2="blur" operator="in" result="glow" />` +
-      `<feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>`;
-    defs.appendChild(glow);
+    [
+      ["glow_primary", theme.accent_primary, theme.primary_glow_opacity],
+      ["glow_highlight", theme.accent_result, theme.highlight_glow_opacity],
+    ].forEach(([id, color, opacity]) => {
+      const glow = createSvg("filter", { id, x: "-20%", y: "-20%", width: "140%", height: "140%" });
+      glow.innerHTML = `<feGaussianBlur in="SourceGraphic" stdDeviation="${theme.glow_blur}" result="blur" />` +
+        `<feFlood flood-color="${color}" flood-opacity="${opacity}" result="glow-color" />` +
+        `<feComposite in="glow-color" in2="blur" operator="in" result="glow" />` +
+        `<feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>`;
+      defs.appendChild(glow);
+    });
     svg.appendChild(defs);
   }
 
@@ -391,6 +443,7 @@
     const config = payload.layout;
     const theme = payload.theme;
     const visual = roleVisual(payload, node);
+    const weight = weightVisual(payload, node);
     const style = statusStyle(node, theme);
     const x = node.x - node.width / 2;
     const y = node.y - node.height / 2;
@@ -401,9 +454,11 @@
       x, y, width: node.width, height: node.height, rx: radius,
       fill: style.fill,
       stroke: style.border,
-      "stroke-width": visual.border_width || 1,
+      "stroke-width": Number(visual.border_width || 1) * (node.weight === "primary" ? 1.3 : 1),
       "stroke-dasharray": dash,
-      filter: node.status === "highlight" ? "url(#glow)" : null,
+      filter: node.status === "highlight"
+        ? "url(#glow_highlight)"
+        : node.weight === "primary" ? "url(#glow_primary)" : null,
     });
     group.appendChild(outer);
     if (visual.shape === "double_border") {
@@ -415,18 +470,35 @@
       }));
     }
     if (visual.accent_bar) {
-      group.appendChild(createSvg("rect", {
-        class: "prism-node-accent", x, y, width: theme.node_accent_bar_width,
-        height: node.height, rx: 1, fill: style.border,
+      const accentRadius = Math.min(radius, node.height / 2);
+      group.appendChild(createSvg("path", {
+        class: "prism-node-accent",
+        d: `M ${x + accentRadius} ${y} Q ${x} ${y} ${x} ${y + accentRadius} V ${y + node.height - accentRadius} Q ${x} ${y + node.height} ${x + accentRadius} ${y + node.height}`,
+        fill: "none", stroke: style.border,
+        "stroke-width": theme.node_accent_bar_width,
+        "stroke-linecap": "round",
       }));
     }
     const iconPath = payload.icons[node.role];
     const iconX = x + config.node_text_padding;
+    const textLayout = nodeTextLayout(payload, node, node.width);
+    const firstTitleBaseline = node.y - textLayout.contentHeight / 2 + config.node_title_font_size;
+    const iconCenterY = firstTitleBaseline - config.node_title_font_size * 0.35;
     if (iconPath) {
+      group.appendChild(createSvg("rect", {
+        class: "prism-node-icon-badge",
+        x: iconX - 6,
+        y: iconCenterY - config.icon_size / 2 - 6,
+        width: config.icon_size + 12,
+        height: config.icon_size + 12,
+        rx: 7,
+        fill: style.border,
+        opacity: theme.icon_badge_opacity,
+      }));
       const icon = createSvg("svg", {
         class: "prism-node-icon",
         x: iconX,
-        y: node.y - config.icon_size / 2,
+        y: iconCenterY - config.icon_size / 2,
         width: config.icon_size,
         height: config.icon_size,
         viewBox: "0 0 24 24",
@@ -440,27 +512,32 @@
       group.appendChild(icon);
     }
     const textX = iconX + config.icon_size + 12;
-    const available = node.width - (textX - x) - config.node_text_padding;
-    const titleChars = Math.max(4, Math.floor(available / config.node_title_font_size));
-    const subtitleChars = Math.max(6, Math.floor(available / config.node_subtitle_font_size));
-    group.appendChild(createSvg("text", {
-      x: textX,
-      y: node.y - 6,
-      fill: style.text,
-      "font-size": config.node_title_font_size,
-      "font-weight": config.title_font_weight,
-      "font-family": "ui-sans-serif, system-ui",
-    }, truncate(node.label, titleChars)));
-    if (node.sublabel) {
+    let textY = firstTitleBaseline;
+    textLayout.titleLines.forEach((line) => {
       group.appendChild(createSvg("text", {
         x: textX,
-        y: node.y + 18,
+        y: textY,
+        fill: style.text,
+        "font-size": config.node_title_font_size,
+        "font-weight": config.title_font_weight,
+        "font-family": "ui-sans-serif, system-ui",
+      }, line));
+      textY += 18;
+    });
+    if (textLayout.subtitleLines.length) {
+      textY += 4;
+      textLayout.subtitleLines.forEach((line) => {
+      group.appendChild(createSvg("text", {
+        x: textX,
+        y: textY,
         fill: style.text,
         "font-size": config.node_subtitle_font_size,
         "font-weight": 400,
         opacity: config.subtitle_opacity,
         "font-family": "ui-sans-serif, system-ui",
-      }, truncate(node.sublabel, subtitleChars)));
+      }, line));
+      textY += 16;
+      });
     }
   }
 
@@ -510,6 +587,7 @@
 
   function orthogonalPoints(payload, edge, result) {
     if (edge.deferred) return edge.points;
+    if (!isParallel(payload) && edge.points?.length) return edge.points;
     const source = result.nodes.find((node) => node.id === edge.from);
     const target = result.nodes.find((node) => node.id === edge.to);
     const direction = isParallel(payload) ? "TD" : payload.prism.diagram.direction;
@@ -621,38 +699,91 @@
     };
   }
 
+  function labelRect(position, config) {
+    const width = position.width + 2 * config.edge_label_bg_padding_x;
+    const height = config.edge_label_font_size + 2 * config.edge_label_bg_padding_y;
+    return {
+      left: position.x - width / 2,
+      top: position.y - height / 2,
+      right: position.x + width / 2,
+      bottom: position.y + height / 2,
+    };
+  }
+
+  function rectsOverlap(left, right, padding = 4) {
+    return !(
+      left.right + padding <= right.left ||
+      right.right + padding <= left.left ||
+      left.bottom + padding <= right.top ||
+      right.bottom + padding <= left.top
+    );
+  }
+
+  function labelCandidates(route, edge, config) {
+    const base = route.labelPosition || edgeLabelPosition(route.points, edge.label, config);
+    const offsets = [0, -20, 20, -40, 40, -60, 60];
+    const horizontal = route.points.length > 1 && route.points.some(
+      (point, index) => index && Math.abs(point.y - route.points[index - 1].y) < 0.1
+    );
+    return offsets.map((offset) => ({
+      ...base,
+      x: horizontal ? base.x : base.x + offset,
+      y: horizontal ? base.y + offset : base.y,
+    }));
+  }
+
+  function placeEdgeLabels(routedEdges, result, config) {
+    const nodeRects = result.nodes.map((node) => ({
+      left: node.x - node.width / 2,
+      top: node.y - node.height / 2,
+      right: node.x + node.width / 2,
+      bottom: node.y + node.height / 2,
+    }));
+    const occupied = [];
+    routedEdges.forEach((item) => {
+      if (!item.edge.label) return;
+      const candidates = labelCandidates(item.route, item.edge, config);
+      const chosen = candidates.find((candidate) => {
+        const rect = labelRect(candidate, config);
+        return !nodeRects.some((nodeRect) => rectsOverlap(rect, nodeRect)) &&
+          !occupied.some((occupiedRect) => rectsOverlap(rect, occupiedRect));
+      }) || candidates[candidates.length - 1];
+      item.labelPosition = chosen;
+      occupied.push(labelRect(chosen, config));
+    });
+  }
+
   function renderEdges(svg, payload, result) {
     const pathGroup = createSvg("g", { class: "edges" });
     const labelGroup = createSvg("g", { class: "edge-labels" });
-    result.edges.forEach((edge) => {
+    const routedEdges = result.edges.map((edge) => ({ edge, route: edgeRoute(payload, edge, result) }));
+    placeEdgeLabels(routedEdges, result, payload.layout);
+    routedEdges.forEach(({ edge, route, labelPosition }) => {
       const visual = payload.ontology.edge_types[edge.type]?.visual || {};
       const kind = edgeColorKind(payload, edge);
       const color = kind === "primary" ? payload.theme.accent_primary : payload.theme.accent_secondary;
-      const route = edgeRoute(payload, edge, result);
+      const feedback = edge.type === "feedback" || edge.direction === "backward";
       pathGroup.appendChild(createSvg("path", {
         d: route.path,
         "data-edge-type": edge.type,
         fill: "none",
         stroke: color,
-        "stroke-width": visual.stroke_width || 1,
+        "stroke-width": Number(visual.stroke_width || 1) * (feedback ? payload.layout.feedback_edge_width_scale : 1),
         "stroke-dasharray": visual.stroke_dash,
         "marker-end": visual.arrow && visual.arrow !== "none" ? `url(#${visual.arrow}_${kind})` : null,
-        opacity: payload.layout.edge_opacity,
+        opacity: feedback ? payload.layout.feedback_edge_opacity : payload.layout.edge_opacity,
       }));
       if (edge.label) {
-        const labelPosition = route.labelPosition || edgeLabelPosition(
-          route.points, edge.label, payload.layout
-        );
-        const width = labelPosition.width;
-        const height = payload.layout.edge_label_font_size + 6;
+        const width = labelPosition.width + 2 * payload.layout.edge_label_bg_padding_x;
+        const height = payload.layout.edge_label_font_size + 2 * payload.layout.edge_label_bg_padding_y;
         labelGroup.appendChild(createSvg("rect", {
           x: labelPosition.x - width / 2,
           y: labelPosition.y - height / 2,
           width,
           height,
-          rx: 2,
+          rx: 4,
           fill: payload.theme.background,
-          opacity: 0.94,
+          opacity: payload.layout.label_bg_opacity,
         }));
         labelGroup.appendChild(createSvg("text", {
           x: labelPosition.x,
@@ -660,13 +791,52 @@
           "text-anchor": "middle",
           fill: payload.theme.text_secondary,
           "font-size": payload.layout.edge_label_font_size,
-          opacity: payload.layout.edge_label_opacity,
+          opacity: feedback
+            ? Math.min(payload.layout.edge_label_opacity, 0.68)
+            : payload.layout.edge_label_opacity,
           "font-family": "ui-sans-serif, system-ui",
         }, edge.label));
       }
     });
     svg.appendChild(pathGroup);
     svg.appendChild(labelGroup);
+  }
+
+  function renderHeader(svg, payload, result) {
+    const config = payload.layout;
+    const x = config.node_route_clearance;
+    const titleY = config.top_margin + config.header_title_font_size;
+    const thesis = payload.prism.diagram.thesis || payload.prism.meta.subtitle || "";
+    const group = createSvg("g", { class: "diagram-header" });
+    group.appendChild(createSvg("text", {
+      x,
+      y: titleY,
+      fill: payload.theme.text_primary,
+      "font-size": config.header_title_font_size,
+      "font-weight": 760,
+      "font-family": "ui-sans-serif, system-ui",
+    }, payload.prism.meta.title));
+    if (thesis) {
+      group.appendChild(createSvg("text", {
+        x,
+        y: titleY + 28,
+        fill: payload.theme.text_secondary,
+        "font-size": config.header_thesis_font_size,
+        "font-weight": 500,
+        opacity: 0.92,
+        "font-family": "ui-sans-serif, system-ui",
+      }, thesis));
+    }
+    group.appendChild(createSvg("line", {
+      x1: x,
+      y1: config.top_margin + config.header_height - 18,
+      x2: result.width - x,
+      y2: config.top_margin + config.header_height - 18,
+      stroke: payload.theme.surface_border,
+      "stroke-width": 1,
+      opacity: 0.55,
+    }));
+    svg.appendChild(group);
   }
 
   function renderLoops(svg, payload, result) {
@@ -719,6 +889,7 @@
       x: 1, y: 1, width: result.width - 2, height: result.height - 2,
       rx: 16, fill: "none", stroke: payload.theme.surface_border, "stroke-width": 1.5,
     }));
+    renderHeader(svg, payload, result);
     renderClusters(svg, payload, result);
     renderEdges(svg, payload, result);
     const nodeGroup = createSvg("g", { class: "nodes" });
@@ -728,6 +899,7 @@
         "data-node-id": node.id,
         "data-role": node.role,
         "data-status": node.status,
+        "data-weight": node.weight,
       });
       renderNode(group, payload, node);
       nodeGroup.appendChild(group);

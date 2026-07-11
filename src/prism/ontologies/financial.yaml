@@ -173,7 +173,7 @@ edge_types:
 
 weights:
   primary:
-    scale: 1.35
+    scale: 1.0
     fill: "#e07b5a"
     text: "#fdf6ec"
     border: "#e07b5a"

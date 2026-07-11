@@ -5,8 +5,5 @@ __pycache__/
 .DS_Store
 node_modules/
 
-# Generated render outputs
-examples/*.html
-prism.html
-prism.yaml
-findings.json
+# Generated workflow outputs
+outputs/

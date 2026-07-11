@@ -29,6 +29,8 @@ def test_mermaid_renderer_includes_styles_and_loops() -> None:
     assert "background: #1f1814" in html
     assert '<svg class="prism-svg"' in svg
     assert 'class="prism-node-accent"' in svg
+    assert '<rect class="prism-node-accent"' not in svg
+    assert '<path class="prism-node-accent"' in svg
     assert 'fill="#e5bc6a"' in svg
     assert 'stroke-width="1.5"' in svg
     assert 'stroke-width="2"' in svg
@@ -37,6 +39,29 @@ def test_mermaid_renderer_includes_styles_and_loops() -> None:
     assert "Feedback loops" in svg
     assert "利率-需求反馈" in svg
     assert '<section class="loops">' not in html
+
+
+def test_browser_renderer_places_labels_and_wraps_node_text() -> None:
+    prism = PrismDoc.from_yaml("examples/china-financial-market-framework.yaml")
+    ontology = load_ontology("financial")
+
+    html = MermaidRenderer().render(prism, ontology)
+
+    assert "function wrapText(text, maxChars)" in html
+    assert "function placeEdgeLabels(routedEdges, result, config)" in html
+    assert "!nodeRects.some((nodeRect) => rectsOverlap(rect, nodeRect))" in html
+    assert "!occupied.some((occupiedRect) => rectsOverlap(rect, occupiedRect))" in html
+    assert "if (!isParallel(payload) && edge.points?.length) return edge.points;" in html
+    assert "routeDeferredEdge(edge, normalized.nodes, normalized.width, payload.layout, index)" in html
+    assert "function renderHeader(svg, payload, result)" in html
+    assert "payload.prism.diagram.thesis || payload.prism.meta.subtitle" in html
+    assert "payload.ontology.weights[node.weight]" in html
+    assert 'class: "diagram-header"' in html
+    assert "feedback_edge_opacity" in html
+    assert "y: positioned.y + payload.layout.header_height" in html
+    assert "marginy: config.top_margin" in html
+    assert "const preferredWidth = iconAndPadding + contentWidth + config.node_one_line_slack;" in html
+    assert "Math.min(config.node_max_width, Math.max(baseWidth, preferredWidth))" in html
 
 
 def test_mermaid_source_keeps_node_ids() -> None:

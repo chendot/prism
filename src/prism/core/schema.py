@@ -107,6 +107,7 @@ class Diagram(PrismBaseModel):
 
     type: DiagramType
     direction: Direction
+    thesis: str | None = None
 
 
 class Node(PrismBaseModel):

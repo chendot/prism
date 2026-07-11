@@ -61,7 +61,14 @@ def test_each_role_renders_its_ontology_shape(role: str) -> None:
     assert f'stroke-width="{visual["border_width"]:g}"' in group
     assert ('class="prism-node-accent"' in group) is bool(visual["accent_bar"])
     if visual["accent_bar"]:
-        assert 'fill="url(#grad_bar_primary)"' in group
+        assert '<path class="prism-node-accent"' in group
+        assert 'fill="none" stroke="url(#grad_bar_primary)"' in group
+        outer = re.search(r'class="node-shape node-shape-outer" x="([\d.]+)" y="([\d.]+)"', group)
+        assert outer is not None
+        x, y = map(float, outer.groups())
+        radius = float(visual["radius"])
+        assert f'M {x + radius:.1f} {y:.1f} Q {x:.1f} {y:.1f} {x:.1f}' in group
+        assert 'stroke-linecap="round"' in group
 
 
 def test_round_and_double_border_shapes_have_required_geometry() -> None:
@@ -175,7 +182,7 @@ def test_final_html_contains_visible_markers_and_positive_example_fills() -> Non
         group = _node_group(rendered_svg, node_id)
         assert 'data-status="positive"' in group
         assert 'fill="url(#grad_positive)"' in group
-        assert 'fill="url(#grad_bar_result)"' in group
+        assert 'stroke="url(#grad_bar_result)"' in group
     for edge in prism.edges:
         visual = ontology.edge_visual(edge.type)
         edge_path = rendered_svg.split(
@@ -202,19 +209,25 @@ def test_final_svg_defines_node_and_accent_bar_gradients() -> None:
     assert 'stop-opacity="0.2"' in svg
 
 
-def test_highlight_nodes_use_accent_glow_filter() -> None:
+def test_primary_and_highlight_nodes_use_distinct_accent_glows() -> None:
     ontology = load_ontology("financial")
     renderer = MermaidRenderer()
     highlight = _node_group(renderer.to_svg(_document(role="thesis", status="highlight"), ontology))
+    primary_data = _document(role="asset").model_dump(mode="json", by_alias=True)
+    primary_data["nodes"][0]["weight"] = "primary"
+    primary = _node_group(renderer.to_svg(PrismDoc.model_validate(primary_data), ontology))
     neutral = _node_group(renderer.to_svg(_document(role="asset"), ontology))
     svg = renderer.to_svg(_document(role="thesis", status="highlight"), ontology)
 
-    assert '<filter id="glow"' in svg
-    assert '<feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />' in svg
-    assert 'flood-color="#ef805d" flood-opacity="0.6"' in svg
+    assert '<filter id="glow_primary"' in svg
+    assert '<filter id="glow_highlight"' in svg
+    assert '<feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="blur" />' in svg
+    assert 'flood-color="#e5bc6a" flood-opacity="0.28"' in svg
+    assert 'flood-color="#ef805d" flood-opacity="0.48"' in svg
     assert 'class="node-shape node-shape-outer"' in highlight
-    assert 'filter="url(#glow)"' in highlight
-    assert 'filter="url(#glow)"' not in neutral
+    assert 'filter="url(#glow_highlight)"' in highlight
+    assert 'filter="url(#glow_primary)"' in primary
+    assert 'filter="url(#glow_' not in neutral
     assert 'fill="#1f1814" font-size="15"' in highlight
     assert 'stroke="#1f1814"' in highlight
     assert 'fill="#f7e6c4" font-size="15"' in neutral
@@ -265,6 +278,9 @@ def test_each_role_renders_an_inline_icon_inside_node_bounds(role: str) -> None:
 
     assert outer is not None
     assert icon is not None
+    assert 'class="prism-node-icon-badge"' in group
+    assert 'width="28" height="28" rx="7"' in group
+    assert 'opacity="0.12"' in group
     assert ROLE_ICON_PATHS[role] in group
     node_x, node_y, node_width, node_height = map(float, outer.groups())
     icon_x, icon_y = map(float, icon.groups()[:2])

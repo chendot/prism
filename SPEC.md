@@ -24,6 +24,8 @@ Prism 分为三个物理隔离层：
 
 层间通信只能通过文件或显式数据对象完成，不共享隐藏状态。
 
+默认 CLI 生成物统一写入 `outputs/`：`compress` 生成 `prism.yaml`，`research` 生成 `findings.json`，`render` 按输入 YAML 的文件名生成 HTML，`run` 生成完整的三项产物。`examples/` 只存放可提交的成熟 YAML 模板和样例，不作为默认输出目录。
+
 ## prism.yaml
 
 顶层字段固定为：
@@ -40,6 +42,7 @@ render: {}
 关键约束：
 
 - `meta.ontology` 指定运行时 ontology。
+- `diagram.thesis` 可选。一句核心判断，供平台策略和读者快速识别图解的叙事中心。
 - `nodes[].id` 必须是唯一的 lowercase snake_case。
 - `nodes[].role` 只在 schema 中声明为字符串，合法值由 ontology 校验。
 - `nodes[].weight` 只在 schema 中声明为字符串，合法值由 ontology 的 `weights` 块校验，默认 `secondary`。
@@ -107,6 +110,16 @@ class Compressor(ABC):
     def compress(self, topic: str, findings: dict | None, ontology: Ontology) -> PrismDoc: ...
 ```
 
+### LLMCompressor 内部工作流
+
+`LLMCompressor` 的实现保持在 Compression 层内，不调用 Research。它按以下三步执行：
+
+1. **Story Planning**：仅根据 `topic` 生成内存中的 `GraphPlan`，包含 `thesis`、`template`、选择理由和按叙事顺序排列的 3–6 个 `main_path` 概念。template 的选择以该计划为准，不再由关键词规则单独决定。
+2. **Plan display**：在终端打印 GraphPlan 的 thesis、template（含理由）和 main path，供非阻断式人工扫读；GraphPlan 不落盘，不是 Prism 的 canonical 资产。
+3. **YAML realization**：以锁定的 GraphPlan、topic、可选 findings 和 ontology 生成 `prism.yaml`。实现会将 `GraphPlan.thesis` 写入 `diagram.thesis`，确保计划与最终文档一致；随后沿用 validator 的最多两次修复重试。
+
+本地 provider 调用默认通过独立子进程执行：Story Planning 与 YAML realization 各一次。设置 `PRISM_LLM_DEBUG=1` 时，Compressor 会向 stderr 输出阶段边界、命令、返回码以及 stdout/stderr 的长度和预览，供排查 provider 启动或输出问题。
+
 新增 research engine：
 
 ```python
@@ -129,7 +142,7 @@ meta:
   target_format: "x_card"      # 可选，指定发布平台策略
 ```
 
-`template` 字段由 LLMCompressor 在 Step 1 判断后写入，Compressor Step 2 读取它来约束生成结构。Renderer 不读 `template`。
+`template` 字段由 LLMCompressor 的 Story Planning 选定后写入。YAML realization 读取锁定的 GraphPlan 来约束生成结构；Renderer 不读 `template`。
 
 `target_format` 是 Renderer 的平台密度策略契约（见下方 Platform Strategy）。当前 dagre renderer 先保留完整结构，尚未实现按 `target_format` 筛选节点或切换平台尺寸的分支。
 
