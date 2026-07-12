@@ -66,14 +66,20 @@
     return payload.ontology.weights[node.weight] || {};
   }
 
-  function wrapText(text, maxChars) {
+  function wrapText(text, maxWidth, fontSize) {
     if (!text) return [];
     const lines = [];
-    let remaining = text.trim();
-    while (remaining) {
-      lines.push(remaining.slice(0, maxChars));
-      remaining = remaining.slice(maxChars).trim();
+    let line = "";
+    for (const character of text.trim()) {
+      const candidate = line + character;
+      if (line && estimateTextWidth(candidate, fontSize) > maxWidth) {
+        lines.push(line.trimEnd());
+        line = character === " " ? "" : character;
+      } else {
+        line = candidate;
+      }
     }
+    if (line.trim()) lines.push(line.trimEnd());
     return lines;
   }
 
@@ -81,10 +87,8 @@
     const config = payload.layout;
     const iconFootprint = config.node_text_padding + config.icon_size + 12;
     const available = width - iconFootprint - config.node_text_padding;
-    const titleChars = Math.max(4, Math.floor(available / config.node_title_font_size));
-    const subtitleChars = Math.max(6, Math.floor(available / config.node_subtitle_font_size));
-    const titleLines = wrapText(node.label, titleChars);
-    const subtitleLines = wrapText(node.sublabel, subtitleChars);
+    const titleLines = wrapText(node.label, available, config.node_title_font_size);
+    const subtitleLines = wrapText(node.sublabel, available, config.node_subtitle_font_size);
     const contentHeight =
       titleLines.length * 18 +
       (subtitleLines.length ? 4 + subtitleLines.length * 16 : 0);

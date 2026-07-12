@@ -47,7 +47,8 @@ def test_browser_renderer_places_labels_and_wraps_node_text() -> None:
 
     html = MermaidRenderer().render(prism, ontology)
 
-    assert "function wrapText(text, maxChars)" in html
+    assert "function wrapText(text, maxWidth, fontSize)" in html
+    assert "estimateTextWidth(candidate, fontSize) > maxWidth" in html
     assert "function placeEdgeLabels(routedEdges, result, config)" in html
     assert "!nodeRects.some((nodeRect) => rectsOverlap(rect, nodeRect))" in html
     assert "!occupied.some((occupiedRect) => rectsOverlap(rect, occupiedRect))" in html
