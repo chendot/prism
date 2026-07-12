@@ -42,6 +42,7 @@ def test_run_uses_llm_compressor_by_default(
             "test-provider",
             "--output-dir",
             str(tmp_path),
+            "--no-image",
         ],
     )
 
@@ -68,6 +69,7 @@ def test_run_placeholder_flag_uses_placeholder_compressor(
             "--placeholder",
             "--output-dir",
             str(tmp_path),
+            "--no-image",
         ],
     )
 
@@ -103,9 +105,29 @@ def test_render_defaults_to_outputs_directory(
     file.write_text(source, encoding="utf-8")
     monkeypatch.chdir(tmp_path)
 
-    result = runner.invoke(cli.app, ["render", str(file)])
+    result = runner.invoke(cli.app, ["render", str(file), "--no-image"])
 
     output = tmp_path / "outputs" / "treasury-copy.html"
     assert result.exit_code == 0
     assert output.exists()
     assert f"Rendered: outputs/treasury-copy.html" in result.output
+
+
+def test_render_exports_default_xiaohongshu_image(
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
+    captured: dict[str, object] = {}
+
+    def export(html_path: Path, image_path: Path, target_format: str) -> Path:
+        captured.update(html_path=html_path, image_path=image_path, target_format=target_format)
+        image_path.write_bytes(b"png")
+        return image_path
+
+    monkeypatch.setattr(cli, "export_html_to_png", export)
+    source = Path("examples/treasury.yaml")
+    result = runner.invoke(cli.app, ["render", str(source), "--output", str(tmp_path / "chart.html")])
+
+    assert result.exit_code == 0
+    assert captured["image_path"] == tmp_path / "chart.png"
+    assert captured["target_format"] == "xiaohongshu_card"
+    assert "Image:" in result.output

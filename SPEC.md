@@ -144,7 +144,7 @@ meta:
 
 `template` 字段由 LLMCompressor 的 Story Planning 选定后写入。YAML realization 读取锁定的 GraphPlan 来约束生成结构；Renderer 不读 `template`。
 
-`target_format` 是 Renderer 的平台密度策略契约（见下方 Platform Strategy）。当前 dagre renderer 先保留完整结构，尚未实现按 `target_format` 筛选节点或切换平台尺寸的分支。
+`target_format` 是 Renderer 的平台密度策略契约（见下方 Platform Strategy）。当前 dagre HTML renderer 先保留完整结构，尚未实现按 `target_format` 筛选节点；但 `prism render` 的 PNG 导出会按该字段选择固定发布画布。未指定时默认 `xiaohongshu_card`。
 
 ---
 

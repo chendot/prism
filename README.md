@@ -32,10 +32,21 @@ outputs/treasury.html
 prism validate examples/treasury.yaml
 prism render examples/treasury.yaml
 prism render examples/treasury.yaml --output outputs/treasury-preview.html
+prism render examples/treasury.yaml --target-format xiaohongshu_card
+prism render examples/treasury.yaml --no-image
 prism compress "美债如何运作" --ontology financial
 prism research "美债如何运作" --ontology financial
 prism run "美债如何运作" --ontology financial --skip-research
 prism ontologies
+```
+
+`render` 默认在 HTML 之后导出同名 PNG，默认规格为小红书单图
+`xiaohongshu_card`（1080×1350）。可用 `--target-format x_card` 或
+`--target-format wechat_cover` 切换；也会优先读取 YAML 的
+`meta.target_format`。首次使用图片导出后，安装 Chromium：
+
+```bash
+.venv/bin/python -m playwright install chromium
 ```
 
 ## 项目结构

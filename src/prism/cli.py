@@ -14,6 +14,7 @@ from prism.core.schema import PrismDoc, RendererName
 from prism.core.validator import validate_prism_file
 from prism.ontologies.loader import list_ontologies, load_ontology
 from prism.render.base import Renderer
+from prism.render.image import DEFAULT_IMAGE_PROFILE, ImageExportError, export_html_to_png
 from prism.render.mermaid import MermaidRenderer
 from prism.research.engine import PlaceholderResearchEngine
 
@@ -50,7 +51,13 @@ def validate(file: Path) -> None:
 
 
 @app.command()
-def render(file: Path, output: Path | None = typer.Option(None, "--output", "-o")) -> None:
+def render(
+    file: Path,
+    output: Path | None = typer.Option(None, "--output", "-o"),
+    image_output: Path | None = typer.Option(None, "--image-output"),
+    target_format: str | None = typer.Option(None, "--target-format"),
+    no_image: bool = typer.Option(False, "--no-image"),
+) -> None:
     """Run Layer 3 only: prism.yaml to render output."""
 
     prism = validate_prism_file(file)
@@ -63,6 +70,10 @@ def render(file: Path, output: Path | None = typer.Option(None, "--output", "-o"
         output = DEFAULT_OUTPUT_DIR / f"{file.stem}{suffix}"
     write_text(output, content)
     typer.echo(f"Rendered: {output}")
+    if not no_image:
+        image_path = image_output or output.with_suffix(".png")
+        image_profile = target_format or prism.meta.target_format or DEFAULT_IMAGE_PROFILE
+        _export_image(output, image_path, image_profile)
 
 
 @app.command()
@@ -104,6 +115,8 @@ def run(
     skip_research: bool = typer.Option(False, "--skip-research"),
     placeholder: bool = typer.Option(False, "--placeholder"),
     output_dir: Path = typer.Option(DEFAULT_OUTPUT_DIR, "--output-dir"),
+    target_format: str | None = typer.Option(None, "--target-format"),
+    no_image: bool = typer.Option(False, "--no-image"),
 ) -> None:
     """Run research, compression, and render as one workflow."""
 
@@ -126,6 +139,17 @@ def run(
     render_path = write_text(output_dir / "prism.html", html)
     typer.echo(f"Wrote: {yaml_path}")
     typer.echo(f"Rendered: {render_path}")
+    if not no_image:
+        image_profile = target_format or prism.meta.target_format or DEFAULT_IMAGE_PROFILE
+        _export_image(render_path, output_dir / "prism.png", image_profile)
+
+
+def _export_image(html_path: Path, image_path: Path, target_format: str) -> None:
+    try:
+        export_html_to_png(html_path, image_path, target_format)
+    except ImageExportError as error:
+        raise typer.BadParameter(str(error)) from error
+    typer.echo(f"Image: {image_path} ({target_format})")
 
 
 @app.command("ontologies")
