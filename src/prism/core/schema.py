@@ -40,6 +40,13 @@ class DiagramType(StrEnum):
     DECISION_TREE = "decision_tree"
 
 
+class HierarchyView(StrEnum):
+    """Cognitive scope for a hierarchical framework diagram."""
+
+    OVERVIEW = "overview"
+    DETAIL = "detail"
+
+
 class Direction(StrEnum):
     """Diagram layout direction."""
 
@@ -102,12 +109,36 @@ class Meta(PrismBaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class DiagramGroup(PrismBaseModel):
+    """A semantic container used by hierarchical framework diagrams."""
+
+    id: str
+    title: str
+    kind: str = "group"
+    parent: str | None = None
+    order: int = 0
+
+    @field_validator("id")
+    @classmethod
+    def validate_snake_case_id(cls, value: str) -> str:
+        if not value.replace("_", "").isalnum() or value.lower() != value:
+            raise ValueError("group id must be lowercase snake_case")
+        if value.startswith("_") or value.endswith("_") or "__" in value:
+            raise ValueError("group id must be lowercase snake_case")
+        return value
+
+
 class Diagram(PrismBaseModel):
     """Diagram-level rendering intent."""
 
     type: DiagramType
     direction: Direction
     thesis: str | None = None
+    groups: list[DiagramGroup] = Field(default_factory=list)
+    hierarchy_view: HierarchyView | None = None
+    abstraction_level: str | None = None
+    focus_group: str | None = None
+    omitted_details: list[str] = Field(default_factory=list)
 
 
 class Node(PrismBaseModel):
@@ -119,6 +150,7 @@ class Node(PrismBaseModel):
     role: str
     layer: int | None = None
     lane: str | None = None
+    group: str | None = None
     weight: str = "secondary"
     status: NodeStatus = NodeStatus.NEUTRAL
 

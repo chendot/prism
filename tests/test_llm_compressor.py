@@ -84,3 +84,45 @@ render:
     assert prism.meta.template == "causal_chain"
     assert prism.diagram.thesis == "加息通过融资成本与资产价格共同压低需求。"
     assert "锁定的 GraphPlan" in fake_client.prompts[1]
+
+
+def test_hierarchical_graph_plan_requires_and_displays_group_outline() -> None:
+    compressor = LLMCompressor()
+    plan = compressor._parse_graph_plan(
+        """\
+thesis: 系统边界决定模块职责。
+template: hierarchical_framework
+reason: 主题核心是系统与子系统的包含关系。
+main_path: [输入, 核心, 输出]
+group_outline:
+  - id: root_system
+    title: Root System
+    parent: null
+  - id: core_subsystem
+    title: Core Subsystem
+    parent: root_system
+hierarchy_view: detail
+abstraction_level: 系统子系统
+focus_group: root_system
+omitted_details:
+  - 具体模块和接口
+"""
+    )
+
+    assert plan.group_outline[1].parent == "root_system"
+    assert plan.hierarchy_view == "detail"
+    assert plan.abstraction_level == "系统子系统"
+    assert plan.omitted_details == ("具体模块和接口",)
+    assert "core_subsystem: Core Subsystem (parent: root_system)" in plan.display()
+
+
+def test_hierarchical_generation_prompt_uses_group_contract_and_example() -> None:
+    compressor = LLMCompressor()
+
+    prompt = compressor._build_generation_prompt(
+        "hierarchical_framework", load_ontology("architecture")
+    )
+
+    assert "diagram.groups 表达容器层级" in prompt
+    assert "prism-hierarchical-framework.yaml" in prompt
+    assert "Few-shot example: fed_rate_hike.yaml" not in prompt

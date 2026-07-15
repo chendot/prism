@@ -1,0 +1,137 @@
+meta:
+  title: Prism 层级框架
+  subtitle: Story、canonical contract 与 deterministic render 的职责边界
+  topic: Prism 从主题讨论到层级框架图渲染的系统架构
+  ontology: architecture
+  template: hierarchical_framework
+  visual_theme: warm_layered
+  target_format: xiaohongshu_card
+  audience: intermediate
+  language: zh
+  tags:
+    - prism
+    - architecture
+    - hierarchy
+
+diagram:
+  type: system
+  direction: TD
+  thesis: Prism 用层级 group 表达系统边界，用有向 edge 表达跨边界的数据和控制关系。
+  hierarchy_view: detail
+  abstraction_level: Prism 从结构规划到确定性渲染的系统阶段
+  focus_group: prism_system
+  omitted_details:
+    - Provider 子进程与提示词细节
+    - Validator 的逐字段规则
+    - SVG 节点和边的绘制参数
+  groups:
+    - id: prism_system
+      title: Prism System
+      kind: system
+      order: 1
+    - id: story_layer
+      title: Story 与结构规划
+      kind: subsystem
+      parent: prism_system
+      order: 1
+    - id: contract_layer
+      title: Canonical Contract
+      kind: subsystem
+      parent: prism_system
+      order: 2
+    - id: render_layer
+      title: Deterministic Render
+      kind: subsystem
+      parent: prism_system
+      order: 3
+
+nodes:
+  - id: topic_discussion
+    label: Topic Discussion
+    sublabel: 与 LLM 明确 thesis 和解释边界
+    role: actor
+    group: story_layer
+    weight: secondary
+  - id: story_planning
+    label: Story Planning
+    sublabel: 锁定层级轮廓与关键路径
+    role: service
+    group: story_layer
+    weight: primary
+    status: highlight
+  - id: prism_schema
+    label: Prism Schema
+    sublabel: groups、nodes、edges 的稳定契约
+    role: module
+    group: contract_layer
+    weight: primary
+    status: highlight
+  - id: ontology_validator
+    label: Ontology Validator
+    sublabel: 校验词表、引用和层级关系
+    role: service
+    group: contract_layer
+    weight: secondary
+  - id: dagre_layout
+    label: Dagre Compound Layout
+    sublabel: 计算容器、组件和关系位置
+    role: module
+    group: render_layer
+    weight: secondary
+  - id: svg_renderer
+    label: SVG Renderer
+    sublabel: 按主题视觉语法确定性绘制
+    role: service
+    group: render_layer
+    weight: secondary
+  - id: png_output
+    label: PNG
+    sublabel: 面向发布平台的最终图像
+    role: external_system
+    group: render_layer
+    weight: muted
+
+edges:
+  - from: topic_discussion
+    to: story_planning
+    label: 对齐叙事
+    type: enables
+    direction: forward
+  - from: story_planning
+    to: prism_schema
+    label: 生成结构
+    type: data_flow
+    direction: forward
+  - from: prism_schema
+    to: ontology_validator
+    label: 提交校验
+    type: calls
+    direction: forward
+  - from: ontology_validator
+    to: dagre_layout
+    label: validated prism.yaml
+    type: data_flow
+    direction: forward
+  - from: dagre_layout
+    to: svg_renderer
+    label: 布局结果
+    type: enables
+    direction: forward
+  - from: svg_renderer
+    to: png_output
+    label: 导出
+    type: data_flow
+    direction: forward
+
+loops: []
+
+render:
+  template: hierarchical_framework
+  style: default
+  show_loops: false
+  lanes: []
+  highlight_nodes:
+    - story_planning
+    - prism_schema
+  highlight_edges: []
+  renderer: mermaid

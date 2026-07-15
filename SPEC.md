@@ -43,10 +43,13 @@ render: {}
 
 - `meta.ontology` 指定运行时 ontology。
 - `diagram.thesis` 可选。一句核心判断，供平台策略和读者快速识别图解的叙事中心。
+- `diagram.groups` 可选。层级框架的语义容器列表，每项包含唯一 `id`、`title`、`kind`、可选 `parent` 和同级 `order`。
+- `diagram.hierarchy_view`、`abstraction_level`、`focus_group`、`omitted_details` 仅用于层级框架，分别声明总览/子图、统一抽象层级、当前焦点和主动省略的下钻内容。
 - `nodes[].id` 必须是唯一的 lowercase snake_case。
 - `nodes[].role` 只在 schema 中声明为字符串，合法值由 ontology 校验。
 - `nodes[].weight` 只在 schema 中声明为字符串，合法值由 ontology 的 `weights` 块校验，默认 `secondary`。
 - `nodes[].lane` 可选字段，字符串。仅在 `render.template == "parallel_lanes"` 时生效，用于将节点分配到某条并行泳道；其他 template 忽略该字段。合法值由 `render.lanes[].id` 校验（见下方 render 字段约束）。
+- `nodes[].group` 可选字段。仅在 `render.template == "hierarchical_framework"` 时必填，必须引用 `diagram.groups[].id`。
 - `edges[].type` 只在 schema 中声明为字符串，合法值由 ontology 校验。
 - `edges[].from` 和 `edges[].to` 必须引用已有 node id。
 - `loops[]` 用于保留反馈循环，即使某些 renderer 不能原生表达。
@@ -60,6 +63,17 @@ render: {}
 - 每个 node 的 `lane` 值必须出现在 `render.lanes[].id` 中；否则校验失败。
 - `render.lanes` 至少包含 2 个泳道。
 - 该规则不影响其他 template 的校验路径，属于 additive 检查。
+
+**hierarchical_framework 专属校验规则**：
+
+- `diagram.groups` 至少包含 2 个 group，id 唯一。
+- `group.parent` 必须引用已有 group，且父子关系不能成环。
+- group 嵌套深度最多 3 层；更深结构应拆成多张图。
+- 每个 node 必须设置 `group` 并引用已有 group。
+- 必须使用 `TD`，所有 edge 必须为 `forward`；跨 group edge 只允许连接同一 parent 下相邻顺序的 sibling group。
+- node 和 edge 数量属于认知密度建议，不作为结构校验失败条件；Validator 根据 `target_format` 超限时发出 warning。
+- `overview` 必须在 `focus_group` 下保留 3–7 个直接子 group；每组包含恰好一个 `primary` 主判断，并可带 0–2 个 `secondary` 或 `muted` 辅助要点，不得展开孙级 group。
+- 所有层级图必须声明统一的 `abstraction_level`，并列出 1–5 项 `omitted_details`，把下钻边界变成可校验的 Story 决策。
 
 ## Ontology
 
@@ -100,6 +114,7 @@ class Renderer(ABC):
 - `LayoutConfig` 是节点尺寸、间距、边距、字号与透明度的唯一配置来源；浏览器端只消费该 payload，不维护第二份布局常量。
 - 浏览器端 dagre 负责节点与普通图层级布局；SVG 绘制继续消费 ontology 的 role/edge visual 字段和 theme 的颜色字段。
 - `parallel_lanes` 使用 dagre compound graph（`setParent`）组织泳道节点，并按 `render.lanes[].order` 固定泳道从左到右的顺序。
+- `hierarchical_framework` 使用同一套本地 dagre compound graph 表达 group 嵌套和 node 归属；Renderer 先绘制外层容器，再绘制关系与节点。
 - 泳道内部主流程使用正交直线；入口分流和终点汇聚使用平滑贝塞尔曲线；feedback 使用外侧虚线路由，避免参与主结构的 rank 计算。
 - 生成页面允许纵向滚动、禁止横向溢出，避免高图在视口中被裁切。
 
@@ -114,7 +129,7 @@ class Compressor(ABC):
 
 `LLMCompressor` 的实现保持在 Compression 层内，不调用 Research。它按以下三步执行：
 
-1. **Story Planning**：仅根据 `topic` 生成内存中的 `GraphPlan`，包含 `thesis`、`template`、选择理由和按叙事顺序排列的 3–6 个 `main_path` 概念。template 的选择以该计划为准，不再由关键词规则单独决定。
+1. **Story Planning**：仅根据 `topic` 生成内存中的 `GraphPlan`，包含 `thesis`、`template`、选择理由和按叙事顺序排列的 3–6 个 `main_path` 概念。`hierarchical_framework` 还包含 2–8 个 group 的 `group_outline`。template 的选择以该计划为准，不再由关键词规则单独决定。
 2. **Plan display**：在终端打印 GraphPlan 的 thesis、template（含理由）和 main path，供非阻断式人工扫读；GraphPlan 不落盘，不是 Prism 的 canonical 资产。
 3. **YAML realization**：以锁定的 GraphPlan、topic、可选 findings 和 ontology 生成 `prism.yaml`。实现会将 `GraphPlan.thesis` 写入 `diagram.thesis`，确保计划与最终文档一致；随后沿用 validator 的最多两次修复重试。
 
@@ -154,7 +169,7 @@ meta:
 
 路径：`src/prism/templates/<name>.yaml`
 
-当前四个模板（Phase B 前不再扩展）：
+当前五个模板：
 
 ### value_flow
 
@@ -198,6 +213,25 @@ meta:
 - 泳道数量建议 2–4 条；超过 4 条应考虑拆分为多图或改用 `value_flow`
 - 推荐节点总数：10–18（含入口和汇聚节点）
 - `render.lanes` 必须与实际使用的 `lane` 值一一对应，顺序决定视觉排列顺序（左到右）
+
+### hierarchical_framework
+
+适用主题：系统架构、组织框架、能力体系，以及需要表达“系统 → 子系统 → 模块”包含关系的主题。它与 `layer_stack` 的区别是：`layer_stack` 表达有序层次和依赖，`hierarchical_framework` 表达显式容器和父子归属。
+
+结构约束：
+- 使用 `diagram.groups` 表达容器，使用 `group.parent` 表达嵌套
+- 每个 node 必须通过 `group` 归属一个容器
+- group 嵌套深度为 2–3 层，建议 2–8 个 group
+- 单图只呈现一个抽象层级，使用一致的命名语法与粒度；不得把业务能力、技术组件和具体中间件并排
+- `hierarchy_view: overview` 是 3–7 个一级认知组块的骨架；每个板块恰好一个 `primary` 主判断，可带 0–2 个弱化辅助要点；内部模块进入独立的 `detail` 子图
+- `hierarchy_view: detail` 只展开一个 `focus_group` 对应的认知问题；两种视图均限制在 3–9 个可见 node
+- 整体/局部与父子关系由 group 的空间包含表达，不用 edge 模拟 contains
+- `group.order` 决定同级容器自上而下的阅读与依赖方向；Renderer 使用不可见布局约束保持该顺序
+- edge 只保留关键调用、数据流或真实依赖；同组关系能由位置理解时不画 edge，关系数量不设统一硬上限
+- 跨 group edge 只能单向指向同一 parent 下相邻的下一组；禁止向上、跨层和跳层关系
+- Renderer 弱化层级图的关系线：同组关系不显示箭头，跨组关系使用低透明度开放箭头
+- 颜色只编码 2–3 个稳定语义类别；`omitted_details` 明确记录本图主动不画、应进入后续子图的内容
+- 认知预算以一级 group 为主要组块，而不是直接等同于 node 数。Validator 的 node 密度建议为：`wechat_cover` 3–5、`x_card` 3–6、`xiaohongshu_card` 5–12、`xiaohongshu_carousel` 8–20；未知格式建议 6–15。超出范围仅 warning，不阻止 validate/render
 
 ---
 

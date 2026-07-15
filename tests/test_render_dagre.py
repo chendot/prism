@@ -2,6 +2,7 @@ import json
 import re
 import shutil
 import subprocess
+from copy import deepcopy
 from dataclasses import asdict
 from pathlib import Path
 
@@ -104,6 +105,9 @@ def test_render_embeds_local_dagre_payload_and_python_layout_config() -> None:
     assert payload["layout"] == asdict(renderer.layout_config)
     assert payload["ontology"]["roles"] == ontology.roles
     assert payload["prism"]["meta"]["title"] == prism.meta.title
+    assert 'class: "edge-labels"' in html
+    assert 'fill: "none"' in html
+    assert "opacity: payload.layout.label_bg_opacity" not in html
 
 
 def test_dagre_layout_has_no_node_overlaps_for_all_examples(tmp_path: Path) -> None:
@@ -160,6 +164,54 @@ def test_parallel_lanes_use_compound_parents_and_declared_column_order(
             assert max(float(node["x"]) for node in lane_nodes) - min(
                 float(node["x"]) for node in lane_nodes
             ) < 1
+
+
+def test_hierarchical_framework_uses_nested_compound_groups(tmp_path: Path) -> None:
+    payloads = [
+        payload
+        for payload in _example_payloads()
+        if payload["prism"]["render"].get("template") == "hierarchical_framework"
+    ]
+    layouts = _run_layouts(payloads, tmp_path)
+
+    assert payloads
+    for payload, layout in zip(payloads, layouts):
+        cluster_by_id = {cluster["id"]: cluster for cluster in layout["clusters"]}
+        assert cluster_by_id["story_layer"]["parent"] == "prism_system"
+        assert cluster_by_id["story_layer"]["depth"] == 2
+        for node in layout["nodes"]:
+            assert node["parent"] == f"__group__{node['group']}"
+        for group_id in ("story_layer", "contract_layer", "render_layer"):
+            same_group_nodes = [
+                node for node in layout["nodes"] if node["group"] == group_id
+            ]
+            assert max(node["y"] for node in same_group_nodes) - min(
+                node["y"] for node in same_group_nodes
+            ) < 1
+
+
+def test_hierarchical_framework_group_order_does_not_require_visible_edges(
+    tmp_path: Path,
+) -> None:
+    payload = deepcopy(
+        next(
+            item
+            for item in _example_payloads()
+            if item["prism"]["render"].get("template") == "hierarchical_framework"
+        )
+    )
+    payload["prism"]["edges"] = []
+    payload["prism"]["loops"] = []
+
+    layout = _run_layouts([payload], tmp_path)[0]
+    child_groups = sorted(
+        (cluster for cluster in layout["clusters"] if cluster["parent"] == "prism_system"),
+        key=lambda cluster: cluster["order"],
+    )
+
+    assert [cluster["y"] for cluster in child_groups] == sorted(
+        cluster["y"] for cluster in child_groups
+    )
 
 
 def test_dagre_edges_are_drawn_as_orthogonal_polylines(tmp_path: Path) -> None:

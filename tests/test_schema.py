@@ -98,6 +98,16 @@ def test_schema_accepts_parallel_lane_fields() -> None:
     ]
 
 
+def test_schema_accepts_hierarchical_framework_groups() -> None:
+    prism = PrismDoc.from_yaml("examples/prism-hierarchical-framework.yaml")
+
+    assert prism.meta.template == "hierarchical_framework"
+    assert prism.diagram.hierarchy_view.value == "detail"
+    assert prism.diagram.focus_group == "prism_system"
+    assert prism.diagram.groups[1].parent == "prism_system"
+    assert prism.nodes[0].group == "story_layer"
+
+
 @pytest.mark.parametrize("status", ["neutral", "positive", "negative", "highlight"])
 def test_schema_accepts_valid_node_status(status: str) -> None:
     prism = PrismDoc.from_yaml("examples/treasury.yaml")

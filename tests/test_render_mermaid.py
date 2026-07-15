@@ -52,7 +52,7 @@ def test_browser_renderer_places_labels_and_wraps_node_text() -> None:
     assert "function placeEdgeLabels(routedEdges, result, config)" in html
     assert "!nodeRects.some((nodeRect) => rectsOverlap(rect, nodeRect))" in html
     assert "!occupied.some((occupiedRect) => rectsOverlap(rect, occupiedRect))" in html
-    assert "if (!isParallel(payload) && edge.points?.length) return edge.points;" in html
+    assert "const middleY = (start.y + end.y) / 2;" in html
     assert "routeDeferredEdge(edge, normalized.nodes, normalized.width, payload.layout, index)" in html
     assert "function renderHeader(svg, payload, result)" in html
     assert "payload.prism.diagram.thesis || payload.prism.meta.subtitle" in html
@@ -752,7 +752,7 @@ def test_parallel_lanes_render_guides_and_margin_feedback_route() -> None:
     assert 'data-edge-type="feedback"' in svg
     assert 'stroke-dasharray="4,4"' in svg
     assert '<rect x="' in svg
-    assert 'fill="#1f1814" /><text' in svg
+    assert 'fill="none" /><text' in svg
     assert "L 40.0" in feedback_path or "L 860.0" in feedback_path
     assert "L 450.0" not in feedback_path
 
@@ -784,7 +784,7 @@ def test_parallel_lanes_vertical_edge_label_uses_gap_midpoint() -> None:
     label = renderer._parallel_edge_label(edge, positions, theme, "vertical")
 
     assert f'y="{expected_y:.1f}"' in label
-    assert 'fill="#1f1814"' in label
+    assert 'fill="none"' in label
 
 
 def test_parallel_lanes_skips_invalid_edges_with_warning(caplog) -> None:

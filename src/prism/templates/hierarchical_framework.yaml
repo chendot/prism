@@ -1,0 +1,44 @@
+name: hierarchical_framework
+description: 用于表达系统、框架、组织或能力体系中的父子包含关系。
+diagram:
+  type: system
+  direction: TD
+constraints:
+  required_semantics:
+    - explicit_groups
+    - parent_child_hierarchy
+    - components_inside_groups
+    - ordered_groups
+  hierarchy:
+    min_depth: 2
+    max_depth: 3
+    min_groups: 2
+    max_groups: 8
+  cognitive_budget:
+    overview_primary_groups: {min: 3, max: 7}
+    nodes_per_overview_group: {min: 1, max: 3}
+    target_node_guidance:
+      wechat_cover: {min: 3, max: 5}
+      x_card: {min: 3, max: 6}
+      xiaohongshu_card: {min: 5, max: 12}
+      xiaohongshu_carousel: {min: 8, max: 20}
+  loop_required: false
+instructions:
+  - 图是给人脑使用的认知界面，不是模块清单；单屏必须可在工作记忆中解析。
+  - 必须声明 hierarchy_view、abstraction_level、focus_group 和 omitted_details。
+  - overview 只保留 3 到 7 个同粒度板块；每个板块恰好一个 primary 主判断，可带 0 到 2 个 secondary 或 muted 辅助要点。
+  - 节点数量按 target_format 给出认知密度建议，不作为结构校验失败条件；超出建议范围时优先拆图或调整画布。
+  - detail 只展开一个焦点问题，节点密度服从当前 target_format 的建议范围。
+  - 同一张图的所有框保持相同抽象海拔、命名语法和粒度。
+  - 先确定顶层系统边界，再拆分子系统和模块。
+  - diagram.groups 表达包含关系，edge 表达依赖、调用、控制和数据流。
+  - 每个 node 都要设置 group，并引用 diagram.groups 中的 group id。
+  - group.parent 只引用另一个 group；顶层 group 的 parent 留空。
+  - 不要用普通 node 假装容器。
+  - 整体与局部、父级与子级关系由 group 的空间包含表达，不要为包含关系创建 edge。
+  - 优先使用 group.order 和 node 在 group 内的位置表达阅读顺序，不要依赖箭头串起全部节点。
+  - 只允许 TD；跨 group edge 只能从当前层指向同一 parent 下相邻的下一层。
+  - edge 只保留关键调用、数据流或真实依赖；关系数量属于认知密度判断，不使用固定硬上限。
+  - 同一 group 内能通过上下或左右位置理解的关系，可以不创建 edge。
+  - 颜色只编码 2 到 3 个稳定语义类别，同色必须同类。
+  - 避免超过三层嵌套；过深时拆成多张图。

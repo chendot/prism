@@ -132,16 +132,40 @@
     return payload.prism.render.template === "parallel_lanes";
   }
 
+  function isHierarchy(payload) {
+    return payload.prism.render.template === "hierarchical_framework";
+  }
+
+  function hierarchyDepth(group, groupsById) {
+    let depth = 0;
+    let current = group;
+    const seen = new Set();
+    while (current) {
+      if (seen.has(current.id)) break;
+      seen.add(current.id);
+      depth += 1;
+      current = current.parent ? groupsById[current.parent] : null;
+    }
+    return depth;
+  }
+
   function buildGraph(payload) {
     const prism = payload.prism;
     const config = payload.layout;
     const parallel = isParallel(payload);
+    const hierarchy = isHierarchy(payload);
     const laneDefs = parallel
       ? [...(prism.render.lanes || [])].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
       : [];
     const laneIds = laneDefs.map((lane) => lane.id);
+    const groupDefs = hierarchy
+      ? [...(prism.diagram.groups || [])].sort(
+        (a, b) => a.order - b.order || a.id.localeCompare(b.id)
+      )
+      : [];
+    const groupsById = Object.fromEntries(groupDefs.map((group) => [group.id, group]));
     const shared = parallel ? sharedLaneNodes(prism, laneIds) : { entry: null, convergence: null };
-    const graph = new root.dagre.graphlib.Graph({ compound: parallel, multigraph: true });
+    const graph = new root.dagre.graphlib.Graph({ compound: parallel || hierarchy, multigraph: true });
     graph.setGraph({
       rankdir: parallel ? "TB" : prism.diagram.direction,
       ranker: "network-simplex",
@@ -164,6 +188,54 @@
         });
       });
     }
+    if (hierarchy) {
+      const childGroups = {};
+      groupDefs.forEach((group) => {
+        const parent = group.parent || "__root__";
+        (childGroups[parent] ||= []).push(group);
+      });
+      const representative = (groupId) => {
+        const directNode = prism.nodes.find((node) => node.group === groupId);
+        if (directNode) return directNode.id;
+        const child = (childGroups[groupId] || [])[0];
+        return child ? representative(child.id) : null;
+      };
+      Object.entries(childGroups).forEach(([parent, siblings]) => {
+        const ordered = [...siblings].sort(
+          (left, right) => left.order - right.order || left.id.localeCompare(right.id)
+        );
+        ordered.slice(0, -1).forEach((group, index) => {
+          const source = representative(group.id);
+          const target = representative(ordered[index + 1].id);
+          if (source && target && source !== target) {
+            graph.setEdge(
+              source,
+              target,
+              { hidden: true, minlen: 1, weight: 12 },
+              `hierarchy-order-${parent}-${index}`
+            );
+          }
+        });
+      });
+    }
+    if (hierarchy) {
+      groupDefs.forEach((group) => {
+        graph.setNode(`__group__${group.id}`, {
+          cluster: true,
+          groupId: group.id,
+          title: group.title,
+          kind: group.kind,
+          depth: hierarchyDepth(group, groupsById),
+          width: config.node_width,
+          height: config.node_height,
+        });
+      });
+      groupDefs.forEach((group) => {
+        if (group.parent) {
+          graph.setParent(`__group__${group.id}`, `__group__${group.parent}`);
+        }
+      });
+    }
 
     prism.nodes.forEach((node) => {
       const dimensions = nodeDimensions(payload, node, laneIds.length);
@@ -179,11 +251,14 @@
         node.id !== shared.convergence
       ) {
         graph.setParent(node.id, `__lane__${node.lane}`);
+      } else if (hierarchy && node.group && groupsById[node.group]) {
+        graph.setParent(node.id, `__group__${node.group}`);
       }
     });
 
     const renderedEdges = visibleEdges(prism);
     const deferredEdges = [];
+    const intraGroupEdges = [];
     renderedEdges.forEach((edge, index) => {
       if (edge.type === "feedback" || edge.direction === "backward") {
         deferredEdges.push({ edge, edgeIndex: index });
@@ -191,6 +266,10 @@
       }
       const source = prism.nodes.find((node) => node.id === edge.from);
       const target = prism.nodes.find((node) => node.id === edge.to);
+      if (hierarchy && source?.group && source.group === target?.group) {
+        intraGroupEdges.push({ edge, edgeIndex: index });
+        return;
+      }
       const layerDistance =
         source?.layer !== null && source?.layer !== undefined &&
         target?.layer !== null && target?.layer !== undefined
@@ -238,12 +317,28 @@
       });
     }
 
-    return { graph, renderedEdges, deferredEdges, laneDefs, shared };
+    return {
+      graph,
+      renderedEdges,
+      deferredEdges,
+      intraGroupEdges,
+      laneDefs,
+      groupDefs,
+      shared,
+    };
   }
 
   function layout(payload) {
     if (!root.dagre) throw new Error("Bundled dagre runtime is unavailable");
-    const { graph, renderedEdges, deferredEdges, laneDefs, shared } = buildGraph(payload);
+    const {
+      graph,
+      renderedEdges,
+      deferredEdges,
+      intraGroupEdges,
+      laneDefs,
+      groupDefs,
+      shared,
+    } = buildGraph(payload);
     root.dagre.layout(graph);
     const prism = payload.prism;
     const nodes = prism.nodes.map((node) => {
@@ -273,12 +368,18 @@
         };
       })
       .filter(Boolean);
-    const clusters = laneDefs.map((lane) => {
-      const positioned = graph.node(`__lane__${lane.id}`);
+    const groupsById = Object.fromEntries(groupDefs.map((group) => [group.id, group]));
+    const clusterDefs = isHierarchy(payload) ? groupDefs : laneDefs;
+    const clusters = clusterDefs.map((cluster) => {
+      const prefix = isHierarchy(payload) ? "__group__" : "__lane__";
+      const positioned = graph.node(`${prefix}${cluster.id}`);
       return {
-        id: lane.id,
-        title: lane.title,
-        order: lane.order,
+        id: cluster.id,
+        title: cluster.title,
+        order: cluster.order,
+        kind: cluster.kind || (isParallel(payload) ? "lane" : "group"),
+        parent: cluster.parent || null,
+        depth: isHierarchy(payload) ? hierarchyDepth(cluster, groupsById) : 1,
         x: positioned.x,
         y: positioned.y + payload.layout.header_height,
         width: positioned.width,
@@ -287,15 +388,22 @@
     });
     const normalized = isParallel(payload)
       ? normalizeParallelLaneOrder(payload, { nodes, edges, clusters, shared })
-      : { nodes, edges, clusters, width: graph.graph().width };
+      : isHierarchy(payload)
+        ? centerHierarchy(payload, { nodes, edges, clusters, shared }, graph.graph().width)
+        : { nodes, edges, clusters, width: graph.graph().width };
     const deferredLayoutEdges = deferredEdges.map(({ edge }, index) =>
       routeDeferredEdge(edge, normalized.nodes, normalized.width, payload.layout, index)
     );
+    const intraGroupLayoutEdges = intraGroupEdges.map(({ edge }) => ({
+      ...edge,
+      points: [],
+      intraGroup: true,
+    }));
     const loopPanelHeight =
       prism.render.show_loops && prism.loops.length ? payload.layout.node_height + 32 : 0;
     return {
       nodes: normalized.nodes,
-      edges: normalized.edges.concat(deferredLayoutEdges),
+      edges: normalized.edges.concat(intraGroupLayoutEdges, deferredLayoutEdges),
       clusters: normalized.clusters,
       shared,
       width: Math.max(payload.layout.canvas_width, normalized.width),
@@ -303,6 +411,23 @@
       graphHeight: graph.graph().height + payload.layout.header_height,
       loopPanelHeight,
       dagreVersion: root.dagre.version,
+    };
+  }
+
+  function centerHierarchy(payload, result, graphWidth) {
+    const width = Math.max(payload.layout.canvas_width, graphWidth);
+    const delta = Math.max(0, (width - graphWidth) / 2);
+    if (!delta) return { ...result, width };
+    return {
+      ...result,
+      width,
+      nodes: result.nodes.map((node) => ({ ...node, x: node.x + delta })),
+      edges: result.edges.map((edge) => ({
+        ...edge,
+        x: edge.x + delta,
+        points: edge.points.map((point) => ({ ...point, x: point.x + delta })),
+      })),
+      clusters: result.clusters.map((cluster) => ({ ...cluster, x: cluster.x + delta })),
     };
   }
 
@@ -547,24 +672,30 @@
 
   function renderClusters(svg, payload, result) {
     if (!result.clusters.length) return;
-    const group = createSvg("g", { class: "parallel-lanes" });
-    result.clusters.forEach((cluster) => {
+    const group = createSvg("g", {
+      class: isHierarchy(payload) ? "hierarchical-groups" : "parallel-lanes",
+    });
+    [...result.clusters].sort((a, b) => a.depth - b.depth).forEach((cluster) => {
+      const hierarchy = isHierarchy(payload);
+      const insetDepth = Math.max(0, cluster.depth - 1);
       group.appendChild(createSvg("rect", {
         x: cluster.x - cluster.width / 2,
         y: cluster.y - cluster.height / 2,
         width: cluster.width,
         height: cluster.height,
-        rx: 12,
-        fill: "none",
+        rx: hierarchy ? Math.max(8, 16 - insetDepth * 3) : 12,
+        fill: hierarchy ? payload.theme.surface : "none",
         stroke: payload.theme.accent_secondary,
-        "stroke-width": 1.5,
-        "stroke-dasharray": "7 9",
-        opacity: 0.6,
+        "stroke-width": hierarchy ? Math.max(1, 1.8 - insetDepth * 0.3) : 1.5,
+        "stroke-dasharray": hierarchy ? null : "7 9",
+        opacity: hierarchy ? Math.max(0.28, 0.62 - insetDepth * 0.12) : 0.6,
+        "data-group-id": hierarchy ? cluster.id : null,
+        "data-group-depth": hierarchy ? cluster.depth : null,
       }));
       group.appendChild(createSvg("text", {
-        x: cluster.x,
         y: cluster.y - cluster.height / 2 + 22,
-        "text-anchor": "middle",
+        "text-anchor": hierarchy ? "start" : "middle",
+        x: hierarchy ? cluster.x - cluster.width / 2 + 16 : cluster.x,
         fill: payload.theme.text_secondary,
         "font-size": payload.layout.edge_label_font_size,
         "font-weight": 650,
@@ -591,7 +722,6 @@
 
   function orthogonalPoints(payload, edge, result) {
     if (edge.deferred) return edge.points;
-    if (!isParallel(payload) && edge.points?.length) return edge.points;
     const source = result.nodes.find((node) => node.id === edge.from);
     const target = result.nodes.find((node) => node.id === edge.to);
     const direction = isParallel(payload) ? "TD" : payload.prism.diagram.direction;
@@ -765,17 +895,32 @@
     routedEdges.forEach(({ edge, route, labelPosition }) => {
       const visual = payload.ontology.edge_types[edge.type]?.visual || {};
       const kind = edgeColorKind(payload, edge);
-      const color = kind === "primary" ? payload.theme.accent_primary : payload.theme.accent_secondary;
+      const hierarchy = isHierarchy(payload);
+      const groupByNode = hierarchy
+        ? Object.fromEntries(payload.prism.nodes.map((node) => [node.id, node.group]))
+        : {};
+      const sameGroup = hierarchy && groupByNode[edge.from] === groupByNode[edge.to];
+      const color = hierarchy
+        ? payload.theme.accent_secondary
+        : kind === "primary" ? payload.theme.accent_primary : payload.theme.accent_secondary;
       const feedback = edge.type === "feedback" || edge.direction === "backward";
+      const marker = hierarchy
+        ? sameGroup ? null : "url(#open_triangle_secondary)"
+        : visual.arrow && visual.arrow !== "none" ? `url(#${visual.arrow}_${kind})` : null;
+      const opacity = hierarchy
+        ? sameGroup ? 0.32 : 0.48
+        : feedback ? payload.layout.feedback_edge_opacity : payload.layout.edge_opacity;
       pathGroup.appendChild(createSvg("path", {
         d: route.path,
         "data-edge-type": edge.type,
         fill: "none",
         stroke: color,
-        "stroke-width": Number(visual.stroke_width || 1) * (feedback ? payload.layout.feedback_edge_width_scale : 1),
+        "stroke-width": Number(visual.stroke_width || 1) *
+          (hierarchy ? 0.72 : 1) *
+          (feedback ? payload.layout.feedback_edge_width_scale : 1),
         "stroke-dasharray": visual.stroke_dash,
-        "marker-end": visual.arrow && visual.arrow !== "none" ? `url(#${visual.arrow}_${kind})` : null,
-        opacity: feedback ? payload.layout.feedback_edge_opacity : payload.layout.edge_opacity,
+        "marker-end": marker,
+        opacity,
       }));
       if (edge.label) {
         const width = labelPosition.width + 2 * payload.layout.edge_label_bg_padding_x;
@@ -786,8 +931,7 @@
           width,
           height,
           rx: 4,
-          fill: payload.theme.background,
-          opacity: payload.layout.label_bg_opacity,
+          fill: "none",
         }));
         labelGroup.appendChild(createSvg("text", {
           x: labelPosition.x,
@@ -795,9 +939,11 @@
           "text-anchor": "middle",
           fill: payload.theme.text_secondary,
           "font-size": payload.layout.edge_label_font_size,
-          opacity: feedback
-            ? Math.min(payload.layout.edge_label_opacity, 0.68)
-            : payload.layout.edge_label_opacity,
+          opacity: hierarchy
+            ? sameGroup ? 0.58 : 0.72
+            : feedback
+              ? Math.min(payload.layout.edge_label_opacity, 0.68)
+              : payload.layout.edge_label_opacity,
           "font-family": "ui-sans-serif, system-ui",
         }, edge.label));
       }

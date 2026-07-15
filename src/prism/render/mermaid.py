@@ -661,7 +661,7 @@ class MermaidRenderer(Renderer):
                 return (
                     f'<rect x="{rect_x:.1f}" y="{rect_y:.1f}" '
                     f'width="{rect_right - rect_x:.1f}" height="{rect_bottom - rect_y:.1f}" '
-                    f'fill="{theme.background}" />'
+                    'fill="none" />'
                     f'<text x="{label_x:.1f}" y="{adjusted_y:.1f}" text-anchor="middle" '
                     f'fill="{theme.text_secondary}" font-size="{font_size}" opacity="{config.edge_label_opacity:g}" '
                     f'font-family="ui-sans-serif, system-ui">{escape(text)}</text>'
@@ -1815,7 +1815,7 @@ class MermaidRenderer(Renderer):
         background = (
             f'<rect x="{rect_x:.1f}" y="{rect_top:.1f}" '
             f'width="{rect_right - rect_x:.1f}" height="{rect_bottom - rect_top:.1f}" '
-            f'rx="2" fill="{theme.background}" opacity="0.92" />'
+            'rx="2" fill="none" />'
             if collision_aware
             else ""
         )

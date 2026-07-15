@@ -59,6 +59,7 @@ prism/
 │   ├── compression/   # Layer 2：topic/findings -> prism.yaml
 │   ├── render/        # Layer 3：prism.yaml -> HTML/SVG/D3 等输出
 │   ├── ontologies/    # 领域词表和视觉映射
+│   ├── templates/     # value_flow、causal_chain、layer_stack、parallel_lanes、hierarchical_framework
 │   └── cli.py
 ├── examples/
 └── tests/
@@ -71,3 +72,10 @@ prism/
 - `AGENTS.md`：给 Codex/agent 的开发协作规则。
 
 新增 ontology、renderer 或更改 `prism.yaml` 结构前，先看 `SPEC.md`。
+
+层级框架图使用 `meta.template: hierarchical_framework`，通过
+`diagram.groups[].parent` 表达 group 嵌套，通过 `nodes[].group` 表达组件归属；
+`hierarchy_view: overview` 用 3–7 个同粒度板块表达顶层骨架，每层包含一个主判断和至多两个弱化辅助要点；`detail` 每次只展开一个焦点，
+并用 `abstraction_level` 与 `omitted_details` 固化单层抽象和主动省略边界。
+节点总数按 `target_format` 提供密度 warning，不再作为硬校验；硬约束只负责结构、归属和依赖方向正确性。
+可运行 `prism render examples/prism-hierarchical-framework.yaml` 查看完整示例。

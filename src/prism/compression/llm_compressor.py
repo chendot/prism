@@ -20,7 +20,10 @@ from prism.core.models import Ontology
 from prism.core.schema import PrismDoc
 from prism.core.validator import PrismValidationError, validate_prism_doc
 
-TemplateName = Literal["value_flow", "causal_chain", "layer_stack"]
+TemplateName = Literal[
+    "value_flow", "causal_chain", "layer_stack", "hierarchical_framework"
+]
+HierarchyViewName = Literal["overview", "detail"]
 ProviderName = Literal["codex", "claude-cowork"]
 
 MAX_RETRIES = 2
@@ -31,12 +34,27 @@ EXAMPLE_PATHS = [
     PROJECT_ROOT / "examples" / "treasury.yaml",
     PROJECT_ROOT / "examples" / "fed_rate_hike.yaml",
 ]
-VALID_TEMPLATES: tuple[TemplateName, ...] = ("value_flow", "causal_chain", "layer_stack")
+HIERARCHICAL_EXAMPLE_PATH = PROJECT_ROOT / "examples" / "prism-hierarchical-framework.yaml"
+VALID_TEMPLATES: tuple[TemplateName, ...] = (
+    "value_flow",
+    "causal_chain",
+    "layer_stack",
+    "hierarchical_framework",
+)
 VALID_PROVIDERS: tuple[ProviderName, ...] = ("codex", "claude-cowork")
 
 
 class CompressionError(RuntimeError):
     """Raised when LLM compression cannot produce a valid PrismDoc."""
+
+
+@dataclass(frozen=True)
+class GraphPlanGroup:
+    """A planned semantic container for hierarchical framework realization."""
+
+    id: str
+    title: str
+    parent: str | None = None
 
 
 @dataclass(frozen=True)
@@ -47,18 +65,37 @@ class GraphPlan:
     template: TemplateName
     reason: str
     main_path: tuple[str, ...]
+    group_outline: tuple[GraphPlanGroup, ...] = ()
+    hierarchy_view: HierarchyViewName | None = None
+    abstraction_level: str | None = None
+    focus_group: str | None = None
+    omitted_details: tuple[str, ...] = ()
 
     def display(self) -> str:
         """Return a compact, human-scannable terminal summary."""
 
-        return "\n".join(
-            [
-                "GraphPlan",
-                f"  thesis: {self.thesis}",
-                f"  template: {self.template} ({self.reason})",
-                f"  main_path: {' → '.join(self.main_path)}",
-            ]
-        )
+        lines = [
+            "GraphPlan",
+            f"  thesis: {self.thesis}",
+            f"  template: {self.template} ({self.reason})",
+            f"  main_path: {' → '.join(self.main_path)}",
+        ]
+        if self.group_outline:
+            lines.append("  group_outline:")
+            lines.extend(
+                f"    - {group.id}: {group.title}"
+                + (f" (parent: {group.parent})" if group.parent else "")
+                for group in self.group_outline
+            )
+            lines.extend(
+                [
+                    f"  hierarchy_view: {self.hierarchy_view}",
+                    f"  abstraction_level: {self.abstraction_level}",
+                    f"  focus_group: {self.focus_group}",
+                    f"  omitted_details: {'；'.join(self.omitted_details)}",
+                ]
+            )
+        return "\n".join(lines)
 
 
 @dataclass(frozen=True)
@@ -172,11 +209,18 @@ class LLMCompressor(Compressor):
                 "- value_flow：利益分配、资金流、权力转移、DeFi。",
                 "- causal_chain：风险传导、市场周期、政策影响、因果链。",
                 "- layer_stack：系统分层、软件架构、能力栈。",
+                "- hierarchical_framework：系统、框架、组织或能力体系的父子包含关系。",
                 "只输出 YAML mapping，且只能包含以下字段：",
                 "thesis: 一句可检验的核心判断",
-                "template: value_flow | causal_chain | layer_stack",
+                "template: value_flow | causal_chain | layer_stack | hierarchical_framework",
                 "reason: 一句说明为何该结构最适合",
                 "main_path: 3 到 6 个关键概念组成的列表，按叙事顺序排列",
+                "group_outline: 仅 hierarchical_framework 使用，列出 2 到 8 个 "
+                "{id, title, parent}；其他模板输出空列表",
+                "hierarchy_view: hierarchical_framework 使用 overview | detail；其他模板为 null",
+                "abstraction_level: hierarchical_framework 必须用一句话声明所有框的共同抽象层级",
+                "focus_group: hierarchical_framework 必须引用 group_outline 中的焦点 group id",
+                "omitted_details: hierarchical_framework 必须列出 1 到 5 个主动省略、应放进子图的细节",
                 self._topic_prompt(topic, None),
             ]
         )
@@ -215,11 +259,20 @@ class LLMCompressor(Compressor):
                     raise CompressionError("LLM output is not a YAML mapping.")
                 doc_dict.setdefault("meta", {})
                 doc_dict.setdefault("diagram", {})
+                doc_dict.setdefault("render", {})
                 doc_dict["meta"]["topic"] = topic
                 doc_dict["meta"]["ontology"] = ontology.name
                 doc_dict["meta"]["template"] = graph_plan.template
                 doc_dict["meta"].setdefault("visual_theme", "warm_layered")
                 doc_dict["diagram"]["thesis"] = graph_plan.thesis
+                if graph_plan.template == "hierarchical_framework":
+                    doc_dict["render"]["template"] = "hierarchical_framework"
+                    doc_dict["diagram"]["hierarchy_view"] = graph_plan.hierarchy_view
+                    doc_dict["diagram"]["abstraction_level"] = graph_plan.abstraction_level
+                    doc_dict["diagram"]["focus_group"] = graph_plan.focus_group
+                    doc_dict["diagram"]["omitted_details"] = list(
+                        graph_plan.omitted_details
+                    )
                 prism = PrismDoc.model_validate(doc_dict)
                 return validate_prism_doc(prism, ontology)
             except (
@@ -250,7 +303,7 @@ class LLMCompressor(Compressor):
     def _build_generation_prompt(self, template_name: TemplateName, ontology: Ontology) -> str:
         template_rules = self._read_template(template_name)
         ontology_prompt = self._ontology_prompt(ontology)
-        examples = self._examples_prompt()
+        examples = self._examples_prompt(template_name)
         return "\n\n".join(
             [
                 self._read_prompt("system.md"),
@@ -295,9 +348,14 @@ class LLMCompressor(Compressor):
             ]
         )
 
-    def _examples_prompt(self) -> str:
+    def _examples_prompt(self, template_name: TemplateName) -> str:
         parts = []
-        for path in EXAMPLE_PATHS:
+        example_paths = (
+            [EXAMPLE_PATHS[0], HIERARCHICAL_EXAMPLE_PATH]
+            if template_name == "hierarchical_framework"
+            else EXAMPLE_PATHS
+        )
+        for path in example_paths:
             if not path.exists():
                 raise CompressionError(f"Missing few-shot example file: {path}")
             parts.append(f"Few-shot example: {path.name}\n{path.read_text(encoding='utf-8')}")
@@ -376,6 +434,11 @@ class LLMCompressor(Compressor):
         template = data.get("template")
         reason = data.get("reason")
         main_path = data.get("main_path")
+        group_outline = data.get("group_outline", [])
+        hierarchy_view = data.get("hierarchy_view")
+        abstraction_level = data.get("abstraction_level")
+        focus_group = data.get("focus_group")
+        omitted_details = data.get("omitted_details", [])
         if not isinstance(thesis, str) or not thesis.strip():
             raise CompressionError("GraphPlan requires a non-empty thesis.")
         if template not in VALID_TEMPLATES:
@@ -389,11 +452,83 @@ class LLMCompressor(Compressor):
         ):
             raise CompressionError("GraphPlan main_path must contain 3 to 6 non-empty strings.")
 
+        parsed_groups: list[GraphPlanGroup] = []
+        if template == "hierarchical_framework":
+            if not isinstance(group_outline, list) or not 2 <= len(group_outline) <= 8:
+                raise CompressionError(
+                    "hierarchical_framework GraphPlan group_outline must contain 2 to 8 groups."
+                )
+            for item in group_outline:
+                if not isinstance(item, dict):
+                    raise CompressionError("GraphPlan group_outline entries must be mappings.")
+                group_id = item.get("id")
+                title = item.get("title")
+                parent = item.get("parent")
+                if not isinstance(group_id, str) or not group_id.strip():
+                    raise CompressionError("GraphPlan group_outline requires non-empty ids.")
+                if not isinstance(title, str) or not title.strip():
+                    raise CompressionError("GraphPlan group_outline requires non-empty titles.")
+                if parent is not None and not isinstance(parent, str):
+                    raise CompressionError("GraphPlan group parent must be a string or null.")
+                parsed_groups.append(
+                    GraphPlanGroup(
+                        id=group_id.strip(),
+                        title=title.strip(),
+                        parent=parent.strip() if parent else None,
+                    )
+                )
+            group_ids = {group.id for group in parsed_groups}
+            invalid_parents = sorted(
+                group.parent
+                for group in parsed_groups
+                if group.parent is not None and group.parent not in group_ids
+            )
+            if invalid_parents:
+                raise CompressionError(
+                    "GraphPlan group_outline references unknown parent(s): "
+                    + ", ".join(invalid_parents)
+                )
+            if hierarchy_view not in ("overview", "detail"):
+                raise CompressionError(
+                    "hierarchical_framework GraphPlan hierarchy_view must be overview or detail."
+                )
+            if not isinstance(abstraction_level, str) or not abstraction_level.strip():
+                raise CompressionError(
+                    "hierarchical_framework GraphPlan requires abstraction_level."
+                )
+            if not isinstance(focus_group, str) or focus_group not in group_ids:
+                raise CompressionError(
+                    "hierarchical_framework GraphPlan focus_group must reference group_outline."
+                )
+            if (
+                not isinstance(omitted_details, list)
+                or not 1 <= len(omitted_details) <= 5
+                or not all(isinstance(item, str) and item.strip() for item in omitted_details)
+            ):
+                raise CompressionError(
+                    "hierarchical_framework GraphPlan omitted_details must contain 1 to 5 items."
+                )
+        elif group_outline not in ([], None):
+            raise CompressionError(
+                "GraphPlan group_outline must be empty outside hierarchical_framework."
+            )
+
         return GraphPlan(
             thesis=thesis.strip(),
             template=template,
             reason=reason.strip(),
             main_path=tuple(item.strip() for item in main_path),
+            group_outline=tuple(parsed_groups),
+            hierarchy_view=hierarchy_view if template == "hierarchical_framework" else None,
+            abstraction_level=(
+                abstraction_level.strip() if template == "hierarchical_framework" else None
+            ),
+            focus_group=focus_group if template == "hierarchical_framework" else None,
+            omitted_details=(
+                tuple(item.strip() for item in omitted_details)
+                if template == "hierarchical_framework"
+                else ()
+            ),
         )
 
     def _strip_yaml_fence(self, text: str) -> str:

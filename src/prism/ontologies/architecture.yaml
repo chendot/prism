@@ -1,0 +1,61 @@
+name: architecture
+description: 软件、平台与组织系统架构
+
+roles:
+  system:
+    label_zh: 系统
+    visual: {shape: rect, border_width: 2.0, radius: 8, accent_bar: true}
+  subsystem:
+    label_zh: 子系统
+    visual: {shape: double_border, border_width: 1.5, radius: 8, accent_bar: true}
+  service:
+    label_zh: 服务
+    visual: {shape: round, border_width: 1.5, radius: 14, accent_bar: true}
+  module:
+    label_zh: 模块
+    visual: {shape: rect, border_width: 1.0, radius: 8, accent_bar: true}
+  data_store:
+    label_zh: 数据存储
+    visual: {shape: double_border, border_width: 1.5, radius: 8, accent_bar: false}
+  actor:
+    label_zh: 使用者
+    visual: {shape: round, border_width: 1.5, radius: 16, accent_bar: false}
+  external_system:
+    label_zh: 外部系统
+    visual: {shape: rect, border_width: 1.5, border_dash: "4,3", radius: 8, accent_bar: false}
+  risk:
+    label_zh: 风险节点
+    visual: {shape: rect, border_width: 2.0, border_dash: "4,3", radius: 8, accent_bar: false}
+
+edge_types:
+  depends_on:
+    label_zh: 依赖
+    visual: {stroke_width: 1.0, stroke_dash: "4,4", arrow: open_triangle}
+  calls:
+    label_zh: 调用
+    visual: {stroke_width: 1.2, stroke_dash: null, arrow: filled_triangle}
+  data_flow:
+    label_zh: 数据流
+    visual: {stroke_width: 1.2, stroke_dash: null, arrow: filled_triangle}
+  controls:
+    label_zh: 控制
+    visual: {stroke_width: 1.0, stroke_dash: "4,4", arrow: open_triangle}
+  enables:
+    label_zh: 支撑
+    visual: {stroke_width: 1.0, stroke_dash: null, arrow: open_triangle}
+  feedback:
+    label_zh: 反馈
+    visual: {stroke_width: 1.0, stroke_dash: "5,5", arrow: open_triangle}
+
+weights:
+  primary: {scale: 1.15, opacity: 1.0}
+  secondary: {scale: 1.0, opacity: 1.0}
+  muted: {scale: 0.88, opacity: 0.72}
+
+perspectives:
+  - name: 边界视角
+    focus: 系统、子系统、内外部边界
+  - name: 依赖视角
+    focus: 调用、数据流与关键依赖
+  - name: 演进视角
+    focus: 模块职责、耦合与扩展点
